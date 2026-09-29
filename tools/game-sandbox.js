@@ -42,24 +42,34 @@ const ctxStub = () => new Proxy({}, {
   set(){ return true; },
 });
 
-/* DOM 元素桩：id 查询统一返回同一个可写对象，classList 要真能增删（UI 用得上） */
-const el = () => ({
-  textContent: '', innerHTML: '', value: '50', checked: true, disabled: false,
-  style: {}, width: 800, height: 600, clientWidth: 800, clientHeight: 600,
-  classList: {
-    _s: new Set(),
-    add(c){ this._s.add(c); }, remove(c){ this._s.delete(c); },
-    toggle(c){ this._s.has(c) ? this._s.delete(c) : this._s.add(c); },
-    contains(c){ return this._s.has(c); },
-  },
-  addEventListener: noop, removeEventListener: noop, appendChild: noop, removeChild: noop,
-  setAttribute: noop, getAttribute: () => null, focus: noop, blur: noop,
-  getContext: () => ctxStub(),
-  getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
-  querySelectorAll: () => [], querySelector: () => null,
-});
+/* DOM 元素桩：可写、classList 要真能增删（UI 代码用得上） */
+function makeEl(){
+  return {
+    textContent: '', innerHTML: '', value: '50', checked: true, disabled: false,
+    style: {}, width: 800, height: 600, clientWidth: 800, clientHeight: 600,
+    classList: {
+      _s: new Set(),
+      add(c){ this._s.add(c); }, remove(c){ this._s.delete(c); },
+      toggle(c, f){
+        const on = (f === undefined) ? !this._s.has(c) : !!f;
+        on ? this._s.add(c) : this._s.delete(c); return on;
+      },
+      contains(c){ return this._s.has(c); },
+    },
+    addEventListener: noop, removeEventListener: noop, appendChild: noop, removeChild: noop,
+    setAttribute: noop, getAttribute: () => null, focus: noop, blur: noop,
+    getContext: () => ctxStub(),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    querySelectorAll: () => [], querySelector: () => null,
+  };
+}
 
-function makeSandbox(){
+function makeSandbox(opts){
+  opts = opts || {};
+  /* 同一 id 返回同一元素（真实 DOM 语义）：UI 代码常"先取引用、后改状态"，
+     每次新建对象会让这类代码在测试里看不到效果 */
+  const els = new Map();
+  const byId = id => { if (!els.has(id)) els.set(id, makeEl()); return els.get(id); };
   const sb = {
     console, Math, Date, JSON, Map, Set, Array, Object, String, Number, Boolean,
     parseInt, parseFloat, isNaN, isFinite, Promise, Error, RegExp, Symbol,
@@ -71,11 +81,11 @@ function makeSandbox(){
     clearTimeout: noop,
     setInterval: () => 0,
     clearInterval: noop,
-    fetch: () => Promise.reject(new Error('sandbox: no network')),
+    fetch: opts.fetch || (() => Promise.reject(new Error('sandbox: no network'))),
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
     document: {
-      getElementById: () => el(), querySelector: () => null, querySelectorAll: () => [],
-      addEventListener: noop, createElement: () => el(),
+      getElementById: byId, querySelector: () => null, querySelectorAll: () => [],
+      addEventListener: noop, createElement: () => makeEl(),
       body: { appendChild: noop, removeChild: noop, style: {} },
       documentElement: { style: {} },
     },
@@ -85,6 +95,7 @@ function makeSandbox(){
     WebSocket: noop,
   };
   sb.globalThis = sb;
+  sb.__els = els;          // 测试用：按 id 取已创建的元素
   return sb;
 }
 
@@ -99,14 +110,16 @@ function scriptOf(htmlSrc){
  * 载入游戏逻辑，返回 `__G` 句柄。
  * @param {string|null} htmlSrc   页面源码；传 null 用仓库根的 index.html
  * @param {string} exportSpec     `globalThis.__G={ ... }` 内的字段列表（含 getter 写法）
+ * @param {object} [opts]         `{ fetch }` 自定义网络桩；`{ expose:true }` 额外挂 `__G.__sb`（测试用）
  */
-function loadGame(htmlSrc, exportSpec){
-  const sb = makeSandbox();
+function loadGame(htmlSrc, exportSpec, opts){
+  const sb = makeSandbox(opts);
   vm.createContext(sb);
   vm.runInContext(scriptOf(htmlSrc) + ';globalThis.__G={' + exportSpec + '};', sb, { filename: 'index.html' });
   /* 加载完成：rAF 改为同步触发 —— 见文件头说明 2 */
   sb.requestAnimationFrame = (cb) => { cb(); return 0; };
   if (!sb.__G) throw new Error('__G 未挂载，检查 exportSpec：' + exportSpec);
+  if (opts && opts.expose) sb.__G.__sb = sb;
   return sb.__G;
 }
 

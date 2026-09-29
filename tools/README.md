@@ -27,6 +27,7 @@ const d = await G.aiChooseMove();          // ← 别忘了 await
 | `ab-ai-check.js` | A/B 两版页面同局面选点对比 + 威胁链单元测试 + 单步性能预算 |
 | `ai-stats.js` | 困难 vs 困难批量对局统计（红蓝/斜直获胜、步数、对称同构局） |
 | `drive.js` | 命令行「我下棋、AI 应手」交互驱动器，状态存 `drive_state.json` |
+| `check-net-hint.js` | 回归：联机入口可用性提示（模拟 404 / 200 / fetch 抛错，共 10 项断言） |
 | `sim_net_restart.js` | 联机 restart 消息的状态机模拟（对齐 index.html 的 `userReset`/`netHandle`） |
 
 ```bash
@@ -36,6 +37,7 @@ node tools/parallel-selfplay.js --games 64 --jobs 8 --diff hard
 node tools/ai-stats.js 80                                 # 跑 80 局统计
 node tools/drive.js NEW red                               # 开一局，再 MOVE x,y / OPP
 node tools/ab-ai-check.js                                 # 回归：选点分布 + 性能
+node tools/check-net-hint.js                              # 回归：联机入口提示（需离线跑，不依赖服务端）
 ```
 
 > 教训：每个个体对弈局数太少时适应度噪声极大（16 局 62.5% → 32 局 46.9% → 64 局 50.0%）。

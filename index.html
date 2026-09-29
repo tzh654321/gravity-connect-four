@@ -145,6 +145,8 @@ h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
     <button data-mode="net" id="modeNet" title="需通过联机服务器打开本页">联机</button>
   </div>
 
+  <div id="netUnavailable" class="netHint" style="display:none;margin:5px 0 0"></div>
+
   <div class="lbl">AI 强度</div>
   <select id="diffSel" class="sel" title="选择 AI 强度：纯随机在可选点位中随机落子；启发式为规则搜索；神经网络-p2 为训练得到的价值网络 + 深搜">
     <option value="random">纯随机</option>
@@ -2514,7 +2516,7 @@ function userReset(){
 document.getElementById('modeSeg').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.mode === 'net' && !net.available){
-    toast('联机不可用：请通过联机服务器打开本页');
+    toast('联机需要服务端托管本页：先运行 node server/server.js 8765，再用 http://<电脑IP>:8765/ 打开');
     return;
   }
   if (state.mode === 'net' && b.dataset.mode !== 'net') netLeave(true);   // 切走即断开
@@ -2745,10 +2747,26 @@ async function netSend(msg){
   } catch(e){ /* 断线由 pollLoop 统一发现 */ }
 }
 
+/* 静态托管（GitHub Pages 等）没有 /api 后端时的说明。联机靠同源相对接口
+   （GET /api/poll + POST /api/send），所以本页必须由 server/server.js 托管。 */
+const NET_STATIC_HINT =
+  '本页没有联机后端（静态托管不含 /api 接口），联机不可用。自建服务端即可：'
+  + '在电脑上运行 node server/server.js 8765，双方改用 http://<电脑局域网IP>:8765/ 打开本页；'
+  + '想让外网朋友加入，就把 server/ 部署到公网或做内网穿透（须 https）。';
+
 async function netPing(){
-  try { const r = await fetch('/api/ping'); net.available = r.ok; }
+  try { const r = await fetch('/api/ping', { cache:'no-store' }); net.available = r.ok; }
   catch(e){ net.available = false; }
-  document.getElementById('modeNet').disabled = !net.available;
+  const btn = document.getElementById('modeNet');
+  btn.disabled = !net.available;
+  btn.title = net.available
+    ? '创建房间或加入房间'
+    : '联机需要服务端托管本页（Pages 等静态托管不支持）';
+  const tip = document.getElementById('netUnavailable');
+  if (tip){
+    tip.style.display = net.available ? 'none' : '';
+    tip.textContent = net.available ? '' : NET_STATIC_HINT;
+  }
 }
 
 function refreshNetUI(){
@@ -2797,7 +2815,7 @@ async function netCreate(){
     netStore.set({ room:net.room, token:net.token, side:'host' });
     ensurePollLoop();
     setNetBusy(false); refreshNetUI();
-  } catch(e){ netHint.textContent = '无法连接服务器'; }
+  } catch(e){ netHint.textContent = net.available ? '无法连接服务器' : NET_STATIC_HINT; }
   finally{ net.busy = false; }
 }
 
@@ -2815,7 +2833,7 @@ async function netJoin(){
     net.room = code; net.token = d.token; net.side = 'guest'; net.waiting = false;
     net.startSeq = d.seq || 0;                      // 从当下开始拉取，历史靠 resync 恢复
     netStart();
-  } catch(e){ netHint.textContent = '无法连接服务器'; }
+  } catch(e){ netHint.textContent = net.available ? '无法连接服务器' : NET_STATIC_HINT; }
   finally{ net.busy = false; }
 }
 
