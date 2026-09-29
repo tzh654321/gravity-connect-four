@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-06",
+  "agent": "html-leader (aiChooseMove + quietNega ID + HTML内嵌16维MLP叶子)",
+  "model": "tools/neural/model_leaf.json",
+  "settings": { "nnmix": 1.0, "depth": 4, "branchK": 6, "qN": 16, "nodeCap": 100000, "diff": "hard(NN)", "defenseRule": "exact-full-cover" },
+  "opponent": "内置 hard",
+  "final_alternating_3x40": {
+    "games": 120,
+    "score": 10,
+    "折算胜率": 54.2,
+    "red": { "win": 38, "loss": 22, "winRate": 63.3 },
+    "blue": { "win": 27, "loss": 33, "winRate": 45.0 },
+    "avgMoves": 34.9,
+    "per40": [62.5, 45.0, 55.0]
+  },
+  "exploration_matrix_40g_each": {
+    "blue_q10_base": { "winRate": 42.5, "win": 17, "loss": 23 },
+    "blue_q16_r1": { "winRate": 60.0, "win": 24, "loss": 16 },
+    "blue_q16_r2": { "winRate": 40.0, "win": 16, "loss": 24 },
+    "blue_q16_r3": { "winRate": 40.0, "win": 16, "loss": 24 },
+    "blue_q16_3run_avg": { "winRate": 46.7, "win": 56, "loss": 64 },
+    "blue_branch8": { "winRate": 27.5, "win": 11, "loss": 29 },
+    "blue_blueDeeper": { "winRate": 37.5, "win": 15, "loss": 25 },
+    "red_q16": { "winRate": 60.0, "win": 24, "loss": 16 },
+    "red_idA_d5_fullpower": { "winRate": 65.0, "win": 26, "loss": 14 }
+  },
+  "hard_vs_hard_red_floor_20g": 55,
+  "note": "多组 40 局实测收敛：整体交替先手 54.2%，红 63%、蓝 45%，标准误约 ±4.5%。搜索参数（qN 10/16、branch 6/8、蓝方加深、每层节点预算、richModel 混合、叶子模型族 55/40/45 等）全部落在同一平台，无一组出现超过噪声水平的稳定增益。结论：当前引擎与内置 hard 达到对等强度，胜负主要由本游戏先手优势（red≈55–63%）决定；对 hard 的‘取胜率’天花板即先手方占比，继续调参与扩网已无实质回报。"
+}

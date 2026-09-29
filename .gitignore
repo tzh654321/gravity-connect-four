@@ -1,0 +1,36 @@
+# ============ 构建产物（可由脚本重新生成，不入库）============
+android/out/
+android/build/
+# build.py 会把 index.html + android/inject/*.js 复制到这里，源不在此处
+android/app/src/main/assets/
+*.apk
+*.idsig
+
+# ============ 签名密钥（公开仓库绝不入库）============
+# 注意：android/tools/build.py 里含签名口令，公开前建议改为读环境变量
+android/g4.keystore
+*.keystore
+*.jks
+
+# ============ 运行期状态与脚本输出 ============
+tools/drive_state.json
+tools/g4_ai_stats_v3.csv
+
+# ============ 日志 ============
+*.log
+*.err
+
+# ============ 本地历史快照 / 备份（保留在本机，不入库）============
+backup_hard75_20260907/
+versions/
+tools/备份-9.5.html
+tools/neural/重力四子棋-nn-test.html
+
+# ============ AI 工作区 ============
+.workbuddy/
+
+# ============ 杂项 ============
+qc
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,14 @@
+{
+  "score": 0,
+  "nnRedWin": 5,
+  "nnBlueWin": 5,
+  "nnRedLoss": 5,
+  "nnBlueLoss": 5,
+  "draws": 0,
+  "games": 20,
+  "diff": "hard",
+  "depth": 4,
+  "branch": 6,
+  "agent": "html",
+  "wall": 581.781
+}

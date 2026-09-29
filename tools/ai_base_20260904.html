@@ -1,0 +1,2376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>重力四子棋 · Gravity Connect-4</title>
+<style>
+:root{
+  --bg:#eceef2;
+  --card:rgba(255,255,255,.93);
+  --bd:#dde1e8;
+  --tx:#22262e;
+  --mut:#7c828d;
+  --p1:#e04b3c;
+  --p2:#2f6fd0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);
+  font:13px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+canvas.grabbing{cursor:grabbing}
+.card{position:absolute;background:var(--card);border:1px solid var(--bd);border-radius:14px;
+  box-shadow:0 10px 30px rgba(24,30,48,.13);backdrop-filter:blur(10px)}
+#panel{left:14px;top:14px;width:254px;padding:12px 13px 11px;z-index:5;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), opacity .3s}
+#panel.folded{transform:translateX(calc(-100% - 24px));opacity:0;pointer-events:none}
+#panel h1{position:relative;display:flex;align-items:center;justify-content:space-between}
+#btnFold{border:1px solid var(--bd);background:#fff;color:#7c828d;border-radius:6px;cursor:pointer;
+  font-size:12px;line-height:1;padding:3px 6px;font-family:inherit;transition:.14s}
+#btnFold:hover{background:#f1f3f8;color:#22262e;border-color:#b6bdc9}
+#tab{left:14px;top:14px;z-index:6;padding:7px 12px;font-size:12px;color:#4a5058;cursor:pointer;
+  display:none;align-items:center;gap:6px;transition:.2s}
+#tab.show{display:flex}
+#tab:hover{background:#fff;color:#22262e}
+#tab span{font-size:14px;line-height:1}
+h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
+.sub{font-size:10.5px;color:var(--mut);font-weight:400;margin:1px 0 6px;letter-spacing:.4px}
+.lbl{font-size:10.5px;color:var(--mut);margin:10px 0 5px;letter-spacing:.4px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.seg button{padding:6px 0;font-size:11.5px;border:1px solid var(--bd);background:#fff;color:#4a5058;
+  border-radius:8px;cursor:pointer;transition:.14s;font-family:inherit}
+.seg button:hover{border-color:#b6bdc9;background:#fafbfd}
+.seg button.on{background:#242932;color:#fff;border-color:#242932}
+.seg button:disabled{opacity:.4;cursor:default}
+.seg3{grid-template-columns:repeat(3,1fr)}
+.status{margin-top:10px;padding:8px 10px;background:#f4f6fa;border:1px solid #e5e9f0;border-radius:9px}
+.turn{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.dot{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 -1px 2px rgba(0,0,0,.28);flex:none}
+.meta{margin-top:4px;display:flex;justify-content:space-between;font-size:10.5px;color:var(--mut)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btns button{padding:7px 0;font-size:12px;border:1px solid var(--bd);background:#fff;border-radius:8px;
+  cursor:pointer;font-family:inherit;color:#3d434d;transition:.14s}
+.btns button:hover{background:#f1f3f8;border-color:#b6bdc9}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:#4a5058;margin:4px 0;cursor:pointer}
+.chk input{accent-color:#242932;margin:0}
+.hint{margin-top:10px;font-size:10.5px;color:var(--mut);line-height:1.65;border-top:1px dashed var(--bd);padding-top:8px}
+#mmRow{display:none;align-items:center;gap:7px;margin-top:8px;font-size:11px;color:var(--mut)}
+#mmRow.show{display:flex}
+#mmRow input[type=range]{flex:1;accent-color:#242932}
+#mmRow button{padding:4px 8px;font-size:11px;border:1px solid var(--bd);background:#fff;border-radius:7px;cursor:pointer;font-family:inherit}
+/* --- 联机 --- */
+#netBox{display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd)}
+#netBox.show{display:block}
+#netLobby{display:flex;flex-direction:column;gap:6px}
+.netBtn{padding:5px 8px;font-size:12px;border:1px solid var(--bd);background:#fff;border-radius:7px;cursor:pointer;font-family:inherit}
+.netBtn:hover{background:#f1f3f8}
+.netBtn:disabled{opacity:.45;cursor:not-allowed}
+.netRow{display:flex;gap:6px}
+.netRow input{flex:1;min-width:0;padding:4px 7px;font-size:12px;border:1px solid var(--bd);border-radius:7px;font-family:inherit;text-transform:uppercase;letter-spacing:2px}
+.netHint{font-size:11px;color:var(--mut);line-height:1.5;word-break:break-all}
+#netRoom{display:flex;flex-direction:column;gap:6px}
+#netRoom .netBtn{color:#b3301f;border-color:#e5b6ae}
+#netPrep{display:flex;flex-direction:column;gap:5px;padding-top:4px;border-top:1px dashed var(--bd)}
+#netPrep .seg button{font-size:11px;padding:4px 2px}
+#netPrep .netBtn{color:inherit;border-color:var(--bd)}
+#netReady{font-weight:700;background:#eef4ff;border-color:#9db8e8!important}
+#netReady.on{background:#e8f6ea;border-color:#8cc79a!important;color:#1f6b33}
+/* 右上角按钮 */
+#topRight{position:fixed;top:14px;right:14px;z-index:6;display:flex;gap:8px}
+#undoBtn{padding:7px 14px;font-size:13px;font-family:inherit;border:1px solid var(--bd);
+  background:#fff;border-radius:9px;cursor:pointer;box-shadow:0 2px 8px rgba(20,26,40,.08)}
+#undoBtn:hover:not(:disabled){background:#f1f3f8}
+#undoBtn:disabled{opacity:.4;cursor:not-allowed}
+#banner{left:50%;top:22px;transform:translate(-50%,-12px);padding:11px 20px;text-align:center;opacity:0;
+  transition:.28s;pointer-events:none;z-index:8}
+#banner.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#banner .big{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;justify-content:center}
+#banner .bnRow{display:flex;gap:8px;justify-content:center}
+#banner button{padding:5px 14px;font-size:12px;border:1px solid var(--bd);background:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
+#banner button:hover{background:#f1f3f8}
+#help{position:absolute;inset:0;background:rgba(18,22,30,.44);display:flex;align-items:center;justify-content:center;z-index:20}
+#helpBox{max-width:640px;max-height:84vh;overflow:auto;background:#fff;border-radius:16px;padding:20px 24px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);font-size:13px;line-height:1.8;color:#333a44}
+#helpBox h2{margin:0 0 10px;font-size:16px;color:#22262e}
+#helpBox h3{margin:16px 0 4px;font-size:13px;color:#22262e}
+#helpBox ul{margin:4px 0;padding-left:19px}
+#helpBox li{margin:2px 0}
+#helpBox .close{margin-top:16px;display:flex;justify-content:flex-end}
+#helpBox .close button{padding:7px 18px;font-size:12.5px;background:#242932;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit}
+.hidden{display:none!important}
+.k{display:inline-block;padding:0 5px;border:1px solid #d3d8e0;border-radius:5px;background:#f6f8fb;font-size:11.5px}
+/* 右下角缩放浮标（仅缩放变化时短暂显示） */
+#zoomFloat{position:fixed;right:16px;bottom:14px;z-index:6;padding:6px 12px;font-size:12px;
+  background:rgba(30,36,48,.82);color:#fff;border-radius:9px;opacity:0;pointer-events:none;
+  transition:opacity .25s}
+#zoomFloat.show{opacity:1}
+/* 残局导入弹窗 */
+#load{position:absolute;inset:0;background:rgba(18,22,30,.44);display:flex;align-items:center;justify-content:center;z-index:20}
+#loadBox{max-width:460px;width:88%;background:#fff;border-radius:16px;padding:18px 22px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);font-size:13px;color:#333a44}
+#loadBox h2{margin:0 0 8px;font-size:16px;color:#22262e}
+#loadBox p{margin:4px 0;line-height:1.6}
+#loadBox .muted{color:#8a919c;font-size:12px}
+#loadBox textarea{width:100%;box-sizing:border-box;height:180px;margin:10px 0;padding:8px 10px;font-size:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;border:1px solid #cfd5dd;border-radius:8px;resize:vertical;
+  line-height:1.7;color:#333a44}
+#loadBox .loadRow{display:flex;justify-content:flex-end;gap:8px}
+#loadBox .loadRow button{padding:7px 16px;font-size:12.5px;border-radius:8px;cursor:pointer;font-family:inherit}
+#loadDo{background:#242932;color:#fff;border:none}
+#loadClose{background:#fff;border:1px solid #cfd5dd;color:#333a44}
+#loadOk{color:#1f6b33}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="tab" class="card" title="展开面板"><span>≡</span></div>
+
+<div id="panel" class="card">
+  <h1>重力四子棋<button id="btnFold" title="收起面板">«</button></h1>
+  <div class="sub">GRAVITY CONNECT-4 · 无限棋盘</div>
+
+  <div class="lbl">对战模式</div>
+  <div class="seg" id="modeSeg">
+    <button data-mode="hh" class="on">人 · 人</button>
+    <button data-mode="hm" title="玩家先手">人 · 机</button>
+    <button data-mode="mh" title="玩家后手">机 · 人</button>
+    <button data-mode="mm">机 · 机</button>
+    <button data-mode="net" id="modeNet" title="需通过联机服务器打开本页">联机</button>
+  </div>
+
+  <div class="lbl">AI 强度</div>
+  <div class="seg seg3" id="diffSeg">
+    <button data-diff="easy">简单</button>
+    <button data-diff="normal" class="on">普通</button>
+    <button data-diff="hard">困难</button>
+  </div>
+
+  <div class="status">
+    <div class="turn"><span class="dot" id="turnDot"></span><span id="turnText">红方回合</span></div>
+    <div class="meta"><span id="moveCount">落子 0</span></div>
+  </div>
+
+  <div id="mmRow">
+    <button id="mmPause">暂停</button>
+    <span>节奏</span><input type="range" id="mmSpeed" min="0" max="100" value="62">
+  </div>
+
+  <div id="netBox">
+    <div id="netLobby">
+      <button id="netHost" class="netBtn">创建房间（执红）</button>
+      <div class="netRow">
+        <input id="netCode" maxlength="4" placeholder="房间码" autocomplete="off">
+        <button id="netJoin" class="netBtn">加入</button>
+      </div>
+      <div id="netHint" class="netHint"></div>
+    </div>
+    <div id="netRoom" style="display:none">
+      <div id="netInfo" class="netHint"></div>
+      <div id="netPrep">
+        <div id="netPrepState" class="netHint"></div>
+        <label class="chk" style="margin-top:2px"><input type="checkbox" id="optAllowUndo" checked>允许悔棋</label>
+        <div class="lbl" style="margin-top:2px">下轮先手</div>
+        <div class="seg" id="firstSeg" style="grid-template-columns:1fr 1fr">
+          <button data-f="winner">胜方先</button>
+          <button data-f="loser">败方先</button>
+          <button data-f="random" class="on">随机</button>
+          <button data-f="resigner" title="由按下「再来一局」的一方后手，即对方先走">重开方后手</button>
+        </div>
+        <button id="netReady" class="netBtn">准备</button>
+      </div>
+      <button id="netLeave" class="netBtn">断开连接</button>
+    </div>
+  </div>
+
+  <div class="lbl">操作</div>
+  <div class="btns">
+    <button id="btnNew">重新开局</button>
+    <button id="btnHome">回到原点</button>
+    <button id="btnHelp">规则说明</button>
+    <button id="btnCopyRec">复制记录</button>
+    <button id="btnLoad" style="grid-column:1/-1">导入残局</button>
+  </div>
+
+  <div class="lbl">选项</div>
+  <label class="chk"><input type="checkbox" id="optPredict" checked>落点预测</label>
+  <label class="chk"><input type="checkbox" id="optFollow" checked>镜头跟随</label>
+  <label class="chk"><input type="checkbox" id="optCoord">显示坐标</label>
+  <label class="chk"><input type="checkbox" id="optNumber">显示序号</label>
+  <label class="chk"><input type="checkbox" id="optDanger" checked>危险提示</label>
+
+  <div class="hint">滚轮缩放 · 左键拖拽平移 · 回合内双击落子</div>
+</div>
+
+<div id="topRight">
+  <button id="undoBtn" title="悔棋：自己的回合悔掉上两手（对方一手＋自己一手）；对方回合悔一手。机机模式不可用。">↶ 悔棋</button>
+</div>
+
+<div id="zoomFloat">缩放 100%</div>
+
+<div id="banner" class="card">
+  <div class="big"><span class="dot" id="bnDot"></span><span id="bnText">红方获胜</span></div>
+  <div class="bnRow">
+    <button id="bnCopy">复制比赛记录</button>
+    <button id="bnAgain">再来一局</button>
+  </div>
+</div>
+
+<div id="help" class="hidden">
+  <div id="helpBox">
+    <h2>重力四子棋 · 规则</h2>
+    <h3>一、棋盘与坐标</h3>
+    <ul>
+      <li>棋盘是<b>无限大的方格阵</b>，格心坐标为整数 <span class="k">(x, y)</span>，y 轴向上为正。</li>
+      <li>中央 <span class="k">(0, 0)</span> 有一个<b>固定块</b>，不属于任何一方，并且会<b>阻断连四</b>。</li>
+    </ul>
+    <h3>二、重力场（四个分区）</h3>
+    <div style="text-align:center;margin:8px 0 4px">
+      <svg width="230" height="200" viewBox="0 0 230 200">
+        <!-- 四个分区彩色矩形：分界线对齐「固定块边缘」（块半边长6px：左109 右121 上94 下106），
+             使每一段半轴都落在对应重力区内，从而彩色区域囊括两条坐标轴 -->
+        <rect x="109" y="8"   width="116" height="86"  fill="#fdeee7" stroke="#c3d2e8"/>  <!-- 右上：向下 -->
+        <rect x="8"   y="8"   width="101" height="98"  fill="#eaf1fc" stroke="#c3d2e8"/>  <!-- 左上：向右 -->
+        <rect x="121" y="94"  width="104" height="98"  fill="#e9f4ea" stroke="#c3d2e8"/>  <!-- 右下：向左 -->
+        <rect x="8"   y="106" width="113" height="86"  fill="#f7eef7" stroke="#c3d2e8"/>  <!-- 左下：向上 -->
+        <!-- 固定块 (0,0) -->
+        <rect x="109" y="94" width="12" height="12" fill="#4a5058" stroke="#22262e"/>
+        <!-- 重力方向箭头：均指向中心（与 gravAt 一致） -->
+        <g stroke="#5a6270" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M40 50 L90 50 M82 42 L90 50 L82 58"></path>            <!-- 左上：向右 -->
+          <path d="M170 30 L170 80 M162 70 L170 80 L178 70"></path>         <!-- 右上：向下 -->
+          <path d="M65 180 L65 132 M57 140 L65 130 L73 140"></path>         <!-- 左下：向上 -->
+          <path d="M190 150 L140 150 M150 142 L140 150 L150 158"></path>    <!-- 右下：向左 -->
+        </g>
+        <g fill="#7c828d" font-size="10" font-family="sans-serif">
+          <text x="12" y="20">左上：向右</text>
+          <text x="112" y="20">右上：向下</text>
+          <text x="12" y="118">左下：向上</text>
+          <text x="124" y="106">右下：向左</text>
+        </g>
+      </svg>
+    </div>
+    <ul>
+      <li><b>右上</b>（x ≥ 0，y ≥ 1，含 +y 轴）重力<b>向下</b>；<b>右下</b>（x ≥ 1，y ≤ 0，含 +x 轴）重力<b>向左</b>；</li>
+      <li><b>左下</b>（x ≤ 0，y ≤ −1，含 −y 轴）重力<b>向上</b>；<b>左上</b>（x ≤ −1，y ≥ 0，含 −x 轴）重力<b>向右</b>。</li>
+      <li>四个分区首尾相接，形成一个<b>向中心汇聚的螺旋重力场</b>：棋子会先落到坐标轴上，再沿轴滑向中央，围绕固定块堆成十字形。</li>
+    </ul>
+    <h3>三、落子与结算</h3>
+    <ul>
+      <li>轮到自己的回合时，<b>左键双击任意空格</b>，棋子出现在该格正中间。</li>
+      <li>落子后先检查<b>重力方向的相邻格</b>：有棋子或固定块 → 立即固定；为空 → 进入<b>带空气阻力的自由下落</b>（连续坐标，不吸附网格）。</li>
+      <li>下落中撞到其它棋子或固定块 → <b>对齐一次网格</b>，然后重新检查重力方向，如此循环，直到固定。</li>
+      <li><b>必须等棋子完全固定后</b>，才会轮到下一回合。</li>
+    </ul>
+    <h3>四、胜负</h3>
+    <ul>
+      <li>任意方向（横 / 竖 / 两条斜线）连成 <b>4 子</b>即获胜，固定块阻断连线。</li>
+    </ul>
+    <h3>五、操作</h3>
+    <ul>
+      <li><span class="k">滚轮</span> 平滑缩放　<span class="k">左键拖拽</span> 平移视野　<span class="k">双击</span> 落子</li>
+      <li><span class="k">空格</span> 回到原点　<span class="k">N</span> 重新开局</li>
+    </ul>
+    <div class="close"><button id="helpClose">知道了</button></div>
+  </div>
+</div>
+
+<div id="load" class="hidden">
+  <div id="loadBox">
+    <h2>导入残局</h2>
+    <p>粘贴一份「复制记录」得到的对局文本，即可在此重建局面继续下棋。</p>
+    <p class="muted">人 · 人 / 人 · 机 / 机 · 人 / 机 · 机 均可继续；联机模式请先切回单机。</p>
+    <textarea id="loadText" placeholder="1. 红 (-1,0)
+2. 蓝 (0,1)
+…"></textarea>
+    <div class="loadRow">
+      <button id="loadDo">导入局面</button>
+      <button id="loadClose">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ==========================================================================
+   重力四子棋 —— 单文件实现
+   坐标：格心 (x, y) 为整数，y 轴向上为正（渲染时翻转）
+   ========================================================================== */
+
+/* ---------------------- 常量 ---------------------- */
+const R          = 0.40;   // 棋子半径（单位：格）
+const BH         = 0.5;    // 固定块半边长
+const G_ACC      = 26;     // 重力加速度 格/秒²
+const K_PAR      = 4.0;    // 沿重力方向的空气阻力系数（终端速度 ≈ 6.5 格/秒）
+const K_PERP     = 46;     // 垂直重力方向的阻力系数（转向半径 ≈ 0.14 格）
+const DT         = 1/240;  // 物理定步长
+const MAX_STEPS  = 240*45; // 单次飞行最长 45 秒物理时间（保护，正常远小于此）
+const TSCALE     = 2.4;    // 下落动画倍速（不改变物理轨迹，只加快播放）
+const TSCALE_FAR = 7;      // 长距离空飞时的额外加速
+const WIN_LEN    = 4;
+const P1 = 1, P2 = 2, BLOCK = 3;
+const DIRS = [[1,0],[0,1],[1,1],[1,-1]];
+const INF = 1e6;
+
+const COL = {
+  [P1]:  {base:'#e04b3c', dark:'#9d2817', light:'#f79c92', name:'红方', short:'红'},
+  [P2]:  {base:'#2f6fd0', dark:'#173e79', light:'#89aef0', name:'蓝方', short:'蓝'},
+  [BLOCK]:{base:'#4a5058',dark:'#22262e', light:'#767d88', name:'固定块', short:'块'}
+};
+
+const C = {
+  bg:'#eceef2',
+  grid:'#d6dae2', gridMajor:'#c2c8d3',
+  axis:'#b3bac6',
+  qNE:'#fdf2ea', qSE:'#e9f1fc', qSW:'#eef5ec', qNW:'#f9eef4',
+};
+
+/* ---------------------- 棋盘数据 ---------------------- */
+const K = (x,y)=> x + ',' + y;          // 注意：String(-0) === "0"，天然一致
+let occ = new Map();                    // "x,y" -> owner(P1/P2/BLOCK)
+
+const ownerAt = (x,y)=>{ const o = occ.get(K(x,y)); return o === undefined ? 0 : o; };
+const isFree  = (x,y)=> !occ.has(K(x,y));
+function addP(x,y,o){ occ.set(K(x,y), o); }
+function removeP(x,y){ occ.delete(K(x,y)); }
+
+/* ---------------------- 重力场 ---------------------- */
+// 返回单位向量；[0,0] 仅出现在 (0,0) 固定块格
+function gravAt(cx, cy){
+  if (cx >=  0 && cy >=  1) return [ 0,-1];  // 右上：向下
+  if (cx >=  1 && cy <=  0) return [-1, 0];  // 右下：向左
+  if (cx <=  0 && cy <= -1) return [ 0, 1];  // 左下：向上
+  if (cx <= -1 && cy >=  0) return [ 1, 0];  // 左上：向右
+  return [0,0];
+}
+
+/* ---------------------- 碰撞 ---------------------- */
+// 圆(半径R) 与「固定块正方形」+「相邻棋子圆」的相交测试
+function hitTest(x, y){
+  const dx = Math.max(Math.abs(x) - BH, 0);
+  const dy = Math.max(Math.abs(y) - BH, 0);
+  if (dx*dx + dy*dy < R*R) return true;              // 固定块（圆-方）
+  const cx = Math.round(x), cy = Math.round(y);
+  const rr = (2*R)*(2*R);
+  for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){
+    if (i===0 && j===0) continue;
+    if (!occ.has(K(cx+i, cy+j))) continue;
+    const ax = x - (cx+i), ay = y - (cy+j);
+    if (ax*ax + ay*ay < rr) return true;
+  }
+  return false;
+}
+// 整数格是否“可以安放”：空格且不与任何东西重叠
+function cellPlayable(x, y){
+  if (!isFree(x,y)) return false;
+  const dx = Math.max(Math.abs(x) - BH, 0), dy = Math.max(Math.abs(y) - BH, 0);
+  if (dx*dx + dy*dy < R*R - 1e-9) return false;
+  const rr = (2*R)*(2*R) - 1e-9;
+  for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++){
+    if (i===0 && j===0) continue;
+    if (!occ.has(K(x+i, y+j))) continue;
+    if (i*i + j*j < rr) return false;
+  }
+  return true;
+}
+// 回退方向：优先逆着重力，否则逆着速度
+function backDir(g, p){
+  if (g[0] !== 0 || g[1] !== 0) return [-g[0], -g[1]];
+  if (Math.abs(p.vx) >= Math.abs(p.vy)) return [p.vx > 0 ? -1 : 1, 0];
+  return [0, p.vy > 0 ? -1 : 1];
+}
+
+/* ---------------------- 单步物理 ---------------------- */
+function physStep(p){
+  const g = gravAt(Math.round(p.x), Math.round(p.y));
+  const vpar = p.vx*g[0] + p.vy*g[1];          // 沿重力分量
+  const px = p.vx - vpar*g[0], py = p.vy - vpar*g[1]; // 垂直分量
+  const ax = G_ACC*g[0] - K_PAR*vpar*g[0] - K_PERP*px;
+  const ay = G_ACC*g[1] - K_PAR*vpar*g[1] - K_PERP*py;
+  p.vx += ax*DT;  p.vy += ay*DT;
+  p.x  += p.vx*DT; p.y += p.vy*DT;
+  return hitTest(p.x, p.y);
+}
+
+/* ---------------------- 精确落点（物理，离线） ---------------------- */
+function settleExact(sx, sy){
+  let cx = sx, cy = sy;
+  const p = {x:cx, y:cy, vx:0, vy:0};
+  for (let guard=0; guard<40; guard++){
+    const g = gravAt(cx, cy);
+    if (g[0]===0 && g[1]===0) return {x:cx, y:cy};
+    if (!isFree(cx+g[0], cy+g[1])) return {x:cx, y:cy};   // 下方有子 → 立即固定
+
+    p.x = cx; p.y = cy; p.vx = 0; p.vy = 0;
+    let hit = false, steps = 0;
+    while (steps++ < MAX_STEPS){ if (physStep(p)) { hit = true; break; } }
+
+    let nx = Math.round(p.x), ny = Math.round(p.y);
+    const bg = backDir(gravAt(nx, ny), p);
+    let back = 0;
+    while (back < 12 && !cellPlayable(nx, ny)) { nx += bg[0]; ny += bg[1]; back++; }
+
+    if (!hit) return {x:nx, y:ny};                 // 超时保护：就地固定
+    if (nx === cx && ny === cy) return {x:nx, y:ny}; // 卡住：就地固定
+    cx = nx; cy = ny;
+  }
+  return {x:cx, y:cy};
+}
+
+/* ---------------------- 快速落点（格子步进，AI 内层用） ---------------------- */
+/* 说明：重力场是无环的（四个分区逐级汇向坐标轴、再汇向中心），
+   因此格子步进必然在有限步内收敛，无需 visited 集合。 */
+function settleDiscrete(sx, sy){
+  let cx = sx, cy = sy;
+  for (let i=0;i<2000;i++){
+    const g = gravAt(cx, cy);
+    if (g[0]===0 && g[1]===0) break;
+    if (!isFree(cx+g[0], cy+g[1])) break;
+    cx += g[0]; cy += g[1];
+  }
+  return {x:cx, y:cy};
+}
+
+/* ---------------------- 胜负判定 ---------------------- */
+function wouldWin(c, owner){
+  for (const d of DIRS){
+    let n = 1;
+    for (let s=1;s<WIN_LEN;s++){ if (ownerAt(c.x+d[0]*s, c.y+d[1]*s) === owner) n++; else break; }
+    for (let s=1;s<WIN_LEN;s++){ if (ownerAt(c.x-d[0]*s, c.y-d[1]*s) === owner) n++; else break; }
+    if (n >= WIN_LEN) return true;
+  }
+  return false;
+}
+function checkWin(cx, cy, owner){
+  for (const d of DIRS){
+    const cells = [[cx,cy]];
+    for (let s=1;s<WIN_LEN;s++){ const x=cx+d[0]*s, y=cy+d[1]*s; if (ownerAt(x,y)===owner) cells.push([x,y]); else break; }
+    for (let s=1;s<WIN_LEN;s++){ const x=cx-d[0]*s, y=cy-d[1]*s; if (ownerAt(x,y)===owner) cells.unshift([x,y]); else break; }
+    if (cells.length >= WIN_LEN) return cells;
+  }
+  return null;
+}
+
+/* ---------------------- 危险提示 ----------------------
+   标在「空白延伸格」上，按阵营着色；同一格可能两方都危险 → 存 a/b 两项。
+   判定口径（按棋型而非单纯窗口）：
+     大点(2) = 该格落子立即连四（取胜点）
+     小点(1) = 该格落子后形成「活三」（三连且两端延伸格都空且落得住 → 对手堵不住）；
+               或落子后只是二连、但该二连仍有发展空间（至少一端可继续延伸）
+     不标    = 落子后形成的是「死三/伪活二」：三连但只有一端能成四（对手一堵即化解），
+               或二连两端都被封死、无从发展
+   落不住的取胜点（重力方向下方是空格，子会滑走）→ 大点画成「空心圈」，表示看得到但落不进。
+   danger: Map<"x,y", {a:{owner,level,hollow}, b:{owner,level,hollow}|null}>，a 的等级 ≥ b。
+   ------------------------------------------------------------------------------ */
+/* 该格在重力场里能否停住：重力方向相邻格被占（棋子或固定块）即静止 */
+function canSettleCell(x, y){
+  const g = gravAt(x, y);
+  if (g[0] === 0 && g[1] === 0) return true;
+  return ownerAt(x + g[0], y + g[1]) !== 0;
+}
+function putDanger(x, y, owner, level, hollow){
+  const k = K(x, y);
+  const cur = danger.get(k);
+  const nd = { owner:owner, level:level, hollow:hollow };
+  if (!cur){ danger.set(k, { a:nd, b:null }); return; }
+  if (cur.a.owner === owner){ if (cur.a.level < level) cur.a = nd; return; }
+  cur.b = nd;
+  if (cur.b.level > cur.a.level){ const t = cur.a; cur.a = cur.b; cur.b = t; }  // a 恒为高等级
+}
+function computeDanger(){
+  danger = new Map();
+  if (!showDanger) return;
+  /* 1) 收集「值得评估的空格」：属于某个己方已有 ≥2 子、且无方块/对方子阻断的四连窗口 */
+  const checks = [], seen = new Set();
+  for (const [k, o] of occ){
+    if (o === BLOCK) continue;
+    const i = k.indexOf(',');
+    const x = +k.slice(0,i), y = +k.slice(i+1);
+    for (const d of DIRS){
+      for (let off=0; off<WIN_LEN; off++){
+        const cs = [];
+        for (let t=0;t<WIN_LEN;t++) cs.push([x + d[0]*(t-off), y + d[1]*(t-off)]);
+        let mine = 0, bad = false;
+        for (const c of cs){
+          const oo = ownerAt(c[0], c[1]);
+          if (oo === BLOCK || (oo !== 0 && oo !== o)) { bad = true; break; }
+          if (oo === o) mine++;
+        }
+        if (bad || mine < 2) continue;                 // 窗口被阻断或潜力太远 → 不评估
+        for (const c of cs){
+          if (ownerAt(c[0], c[1]) !== 0) continue;
+          const key = K(c[0], c[1]) + '|' + o;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          checks.push({ x:c[0], y:c[1], owner:o });
+        }
+      }
+    }
+  }
+  /* 2) 逐个模拟落子，按棋型定级 */
+  for (const ck of checks){
+    const o = ck.owner;
+    addP(ck.x, ck.y, o);
+    let level = 0, hollow = false;
+    const settle = canSettleCell(ck.x, ck.y);
+    if (wouldWin(ck, o)){
+      level = 2;
+      hollow = !settle;                                // 取胜点但落不进去 → 空心圈
+    } else if (settle && liveThreeWindow(ck.x, ck.y, o)){
+      level = 1;
+    }
+    removeP(ck.x, ck.y);
+    if (level) putDanger(ck.x, ck.y, o, level, hollow);
+  }
+}
+
+/* 落子后是否构成「活三 / 跳二补成跳三」——只认 4 连窗口内的真威胁，
+   不认「借邻方向孤立单子凑出的二连」（如红 (5,0) 上方填 (5,1)，水平毫无威胁 → 不标）。 */
+function liveThreeWindow(x, y, o){                     // 前提：(x,y) 已放 o
+  for (const d of DIRS){
+    for (let off = 0; off < WIN_LEN; off++){
+      const cs = [];
+      for (let t = 0; t < WIN_LEN; t++) cs.push([x + d[0]*(t-off), y + d[1]*(t-off)]);
+      let mine = 0, empt = 0, eIdx = -1, cIdx = -1, bad = false;
+      for (let t = 0; t < WIN_LEN; t++){
+        const oo = ownerAt(cs[t][0], cs[t][1]);
+        if (oo === o) mine++;
+        else if (oo === 0){ empt++; eIdx = t; }
+        else { bad = true; break; }
+        if (cs[t][0] === x && cs[t][1] === y) cIdx = t;
+      }
+      if (bad || mine !== 3 || empt !== 1 || cIdx < 0) continue;
+      if (eIdx === 0 || eIdx === WIN_LEN - 1){
+        // 空格在窗口端点 → 连续三连，看两端是否都能延伸成四（活三）
+        let a = -1, b = -1;
+        for (let t = 0; t < WIN_LEN; t++)
+          if (ownerAt(cs[t][0], cs[t][1]) === o){ if (a < 0) a = t; b = t; }
+        const L = [cs[a][0] - d[0], cs[a][1] - d[1]];
+        const R = [cs[b][0] + d[0], cs[b][1] + d[1]];
+        let wins = 0;
+        for (const e of [L, R]){
+          if (ownerAt(e[0], e[1]) !== 0) continue;
+          addP(e[0], e[1], o);
+          const w = !!checkWin(e[0], e[1], o);
+          removeP(e[0], e[1]);
+          if (w) wins++;
+        }
+        if (wins >= 2) return true;
+      } else {
+        // 空格在窗口内部（X X _ X / X _ X X）：只有原本两己子不相邻（跳二 X_X）才算威胁
+        let o1 = -1, o2 = -1;
+        for (let t = 0; t < WIN_LEN; t++){
+          if (t === cIdx) continue;
+          if (ownerAt(cs[t][0], cs[t][1]) === o){ if (o1 < 0) o1 = t; else o2 = t; }
+        }
+        if (o1 >= 0 && o2 > o1 && o2 - o1 !== 1) return true;   // 原本跳二 → 补成跳三
+      }
+    }
+  }
+  return false;
+}
+
+/* ==========================================================================
+   AI
+   ========================================================================== */
+function genCandidates(){
+  let minX=0,maxX=0,minY=0,maxY=0;
+  for (const k of occ.keys()){
+    const i = k.indexOf(',');
+    const x = +k.slice(0,i), y = +k.slice(i+1);
+    if (x<minX) minX=x; if (x>maxX) maxX=x;
+    if (y<minY) minY=y; if (y>maxY) maxY=y;
+  }
+  let m = 2, cells = [];
+  while (true){
+    cells = [];
+    for (let x=minX-m; x<=maxX+m; x++)
+      for (let y=minY-m; y<=maxY+m; y++)
+        if (isFree(x,y)) cells.push({x,y});
+    if (cells.length <= 460 || m <= 0) break;
+    m--;
+  }
+  return cells;
+}
+
+function scoreWin(cs, owner, placed, idx){
+  let mine=0, theirs=0, blocked=0;
+  for (let i=0;i<cs.length;i++){
+    let o = ownerAt(cs[i][0], cs[i][1]);
+    if (i === idx && placed) o = owner;
+    if (o === 0) continue;
+    if (o === BLOCK){ blocked = 1; break; }
+    if (o === owner) mine++; else theirs++;
+  }
+  if (blocked) return 0;
+  if (mine === 4) return INF;
+  if (theirs === 4) return -INF;
+  if (mine > 0 && theirs > 0) return 0;
+  if (mine > 0) return mine===3 ? 70 : (mine===2 ? 11 : 1.5);
+  if (theirs > 0) return theirs===3 ? -80 : (theirs===2 ? -13 : -1.5);
+  return 0;
+}
+// 在 c 处放一枚 owner 的子，局面价值的增量（只算穿过 c 的 16 个窗口）
+function deltaEval(c, owner){
+  let s = 0;
+  for (const d of DIRS){
+    for (let off=0; off<WIN_LEN; off++){
+      const cs = new Array(WIN_LEN);
+      for (let i=0;i<WIN_LEN;i++) cs[i] = [c.x + d[0]*(i-off), c.y + d[1]*(i-off)];
+      s += scoreWin(cs, owner, true, off) - scoreWin(cs, owner, false, off);
+    }
+  }
+  return s;
+}
+// 当前局面下「所有可达落点」的集合（离散模型下完全准确）
+function landingSet(cands){
+  const set = new Set();
+  for (const c of cands){ const l = settleDiscrete(c.x, c.y); set.add(K(l.x, l.y)); }
+  return set;
+}
+
+/* 统计 owner 当前「落一子即刻连四」的落点数量 */
+function countWins(owner, pts){
+  let n = 0;
+  for (const c of pts) if (isFree(c.x, c.y) && wouldWin(c, owner)) n++;
+  return n;
+}
+/* owner 落一子后，最多能同时拥有几个杀点（>=2 即活三 / 双威胁 = 必胜手）。
+   关键一：活三两端都可落时对手只能堵一端，所以「能造双威胁」和「已连四」同样致命。
+   关键二：本游戏落一子会改变可达性（新子挡住通路，会让原本滑走的格子变成停得住），
+           所以必须「落子后重新计算可达落点集」再数杀点 —— 用旧的落点集会严重漏判。
+   为控制开销，先按窗口价值预筛出最靠近 owner 连子的若干个点再验证。 */
+function forkCount(owner, limit){
+  const cands0 = genCandidates(), lands0 = landingSet(cands0);
+  const pts0 = [];
+  for (const c of cands0) if (lands0.has(K(c.x, c.y))) pts0.push(c);
+  const cand = pts0
+    .map(c => ({ c, v: deltaEval(c, owner) }))
+    .sort((a, b) => b.v - a.v)
+    .slice(0, limit || 20)
+    .map(o => o.c);
+  let best = 0;
+  for (const c of cand){
+    if (wouldWin(c, owner)) { if (best < 1) best = 1; continue; }
+    addP(c.x, c.y, owner);                       // 试放一枚
+    const cands1 = genCandidates(), lands1 = landingSet(cands1);   // 重算可达集！
+    let n = 0;
+    for (const d of cands1){
+      if (!lands1.has(K(d.x, d.y))) continue;
+      if (wouldWin(d, owner)){ n++; if (n >= 2) break; }
+    }
+    removeP(c.x, c.y);
+    if (n > best) best = n;
+    if (best >= 2) break;                        // 已找到双威胁，无需再试
+  }
+  return best;
+}
+
+/* ==========================================================================
+   对局多样化（防 AI 对局千篇一律）
+   困难 AI 评估几乎确定性 → 机机/人机反复对弈时容易整局复刻同一条老主线
+   （实测 150 局 96% 互为对称同构）。解法：**近优加权随机** —— 只在若干候选
+   「难分伯仲」（分差小于阈值）时，按递减权重随机挑一个。这样：
+     ① 质量损失极小（只在这几个几乎等价招之间选）；
+     ② 随机分叉让局面不再收敛到同一条主线（对局更丰富）；
+     ③ 先手方打破后手的固定应手链，常比死板走老主线赢得更多。
+   胜负已分 / 必须防守时 top1 远优于他人 → 阈值不满足 → 不随机，仍走最强招。
+   ========================================================================== */
+function diversifyPick(sorted, pick){
+  if (sorted.length <= 1) return sorted[0];
+  const WIN = 1800;                       // 视为「难分伯仲」的最大分差
+  const W = [1.0, 0.62, 0.45, 0.34, 0.27, 0.22];
+  let n = 1;
+  for (; n < sorted.length && n < W.length &&
+         sorted[0][pick] - sorted[n][pick] <= WIN; n++);
+  if (n <= 1) return sorted[0];
+  let sum = 0; for (let j = 0; j < n; j++) sum += W[j];
+  let r = Math.random() * sum;
+  for (let j = 0; j < n; j++){ r -= W[j]; if (r <= 0) return sorted[j]; }
+  return sorted[n-1];
+}
+
+// 完整评估一个候选（临时落子 → 统计双方杀棋点 / 双威胁 → 撤销）
+function scoreOption(o, me, opp){
+  addP(o.land.x, o.land.y, me);
+  const cands = genCandidates();
+  const lands = landingSet(cands);
+  const pts = [];
+  for (const c of cands) if (lands.has(K(c.x, c.y))) pts.push(c);
+  let myG = 0, opG = 0;
+  for (const c of pts){
+    /* 分别计数（不能用 else-if 互斥）：一格可能同时是双方杀点（共享点），
+       若归给 myG 会漏判 opG → 我方落子后对方能立刻先杀，必须 doom。
+       例：占 (0,-2) 后 (1,-2) 红蓝双方落子都连四，else-if 曾把它算成蓝的，AI 自刎。 */
+    if (wouldWin(c, me)) myG++;
+    if (wouldWin(c, opp)) opG++;
+  }
+  /* 双威胁（活三 / 双三）识别：
+     opFork：我方落子后，对手能否一手造出「两个杀点」——能则我方必败，必须抢先破坏
+     myFork：我方能否一手造出两个杀点 —— 几乎必胜
+     已有立即双杀（myG/opG >= 2）时结论已定，跳过以省时间 */
+  let opFork = 0, myFork = 0;
+  if (myG < 2 && opG < 2){
+    opFork = forkCount(opp) >= 2 ? 1 : 0;
+    if (!opFork) myFork = forkCount(me) >= 2 ? 1 : 0;
+  }
+  removeP(o.land.x, o.land.y);
+  o.myG = myG; o.opG = opG; o.opFork = opFork; o.myFork = myFork;
+  o.doom = opG > 0;          // 落子后对方能立即连四 → 一票否决（轮到对方先动手）
+  /* 关键：若我方落子后对方能立即连四（opG>0），轮到的可是对方 —— 他直接杀，
+     我自己的威胁（myG/myFork）根本来不及兑现，必须清零，不能拿来抵消送命惩罚。
+     例：AI 曾下 (4,1) 自以为双威胁（myG=2），却把它变成红 (4,2) 的支点，红一步连四。 */
+  const myGain = opG > 0 ? 0 : (myG >= 2 ? 30000 : myG === 1 ? 900 : 0);
+  const forkGain = opG > 0 ? 0 : (opFork ? 0 : myFork ? 6000 : 0);
+  o.v = deltaEval(o.land, me) + 0.95 * deltaEval(o.land, opp)
+      + myGain                                       // 双威胁 = 必胜；单威胁 = 逼对手应手
+      + (opG >= 2 ? -32000 : opG === 1 ? -22000 : 0) // 让对手下一手就能连四 = 送分
+      + (opFork ? -24000 : 0)                        // 送对手造活三 = 必败，必须抢先破坏
+      + forkGain;                                    // 我能一手造活三 = 基本锁定胜局
+  return o;
+}
+
+// 我方落子后，对手最佳应手的「自身进攻收益」（第二层）
+// 注意：这里只统计对手自己的收益，不能再计入「对手封堵我」的价值，
+// 否则越强的进攻手越会被扣分（等于自我惩罚）。
+function oppBestReply(o, me, opp){
+  addP(o.land.x, o.land.y, me);
+  let best = 0;
+  const cands = genCandidates(), lands = landingSet(cands);
+  for (const c of cands){
+    if (!lands.has(K(c.x, c.y))) continue;
+    if (wouldWin(c, opp)) { best = 1e6; break; }   // 直接被将死
+    const v = deltaEval(c, opp);                   // 对手自己的进攻价值
+    if (v > best) best = v;
+  }
+  // 对手回应后能一手造出双威胁（活三）→ 同样必败，必须纳入第二层评估，
+  // 否则困难难度会因为「看不见对手的活三」而选出送命的走法（比普通还弱）。
+  if (best < 1e6 && forkCount(opp) >= 2) best = 5e5;
+  removeP(o.land.x, o.land.y);
+  return best;
+}
+
+/* ==========================================================================
+   多层威胁前瞻（多算几步）
+   判断「我方落 o 之后，对方能否在若干手内迫使局面不可收拾」：
+     level 2 = 对方存在一手 r：我方无论怎样应，对方仍能一手造出双杀（活三/双三）
+               或对方直接连四 —— 即 o 不可下，下了必败
+     level 0 = 对方没有这种快速必杀线
+   搜索层序：我(o) → 对方落点(r) → 我最优应对(b) → 对方再落一手还能否双杀(forkCount)。
+   本棋前期每步可选落点很少（往往 < 12），这个全量小型搜索代价很低却能把
+   「两步后的环环相扣杀」提前识破（例：困难 AI 第 28 手需要看到两步后的双杀线）。
+   ========================================================================== */
+function reachPts(){
+  const c = genCandidates(), l = landingSet(c);
+  const out = [];
+  for (const p of c) if (l.has(K(p.x, p.y))) out.push(p);
+  return out;
+}
+const PRESSURE_PEN = 1200;   // threat 1 级（被对手逼到唯一精确应手）的评分惩罚，可进化
+function lookaheadThreat(o, me, opp){
+  /* 返回威胁级：0 = 我落 o 后对手每一步我都有 ≥2 种应手拆解（安全）
+     1 = 对手存在某手 r 逼我「只能唯一精确应手」（失去主动，被持续施压）
+     2 = 对手存在某手 r 使我完全无解（两步内必败 → 与 doom 同级否决）
+     强度按难度分档（用户方法论①：紧张局面/高难度推演全面，低难度只看高分）：
+     hard 每层看 6 个候选，normal 看 4 个（够识别「对手一手成三连/双杀」的杀链） */
+  const W = state.diff === 'hard' ? 6 : 4;
+  addP(o.land.x, o.land.y, me);
+  const bBase = reachPts();                       // 落 o 后可用的所有点
+  const rc = bBase
+    .map(p => ({ p, v: deltaEval(p, opp) }))
+    .sort((a, b) => b.v - a.v)
+    .slice(0, W)
+    .map(x => x.p);
+  let tight = false;
+  for (const r of rc){
+    if (wouldWin(r, opp)){ removeP(o.land.x, o.land.y); return 2; }   // ① 对方一手成杀
+    addP(r.x, r.y, opp);
+    /* 我方应手候选：得分高的 + 「占对方杀点」的防守手（最重要，必须包含 ——
+       不能像早期那样 filter 掉 wouldWin(p,opp) 的点：占对手杀点是堵死它，
+       不是送死；剔除会把「唯一活路」也判成无解 → 全员误报必败）。 */
+    const bBase2 = reachPts();
+    const ranked = bBase2
+      .map(p => ({ p, v: deltaEval(p, me) - 0.7 * deltaEval(p, opp) }))
+      .sort((a, b) => b.v - a.v);
+    const bCand = bBase2.filter(p => wouldWin(p, opp));   // ① 占杀点：堵住立即杀
+    for (let j = 0; j < ranked.length && bCand.length < W + 4; j++){
+      const p = ranked[j].p;
+      if (!bCand.includes(p)) bCand.push(p);
+    }
+    let saves = 0;
+    for (const bp of bCand){
+      addP(bp.x, bp.y, me);
+      const winMe = wouldWin(bp, me);            // ② 我反杀：对手被迫先防我，算拆解成功
+      let oppKill = 0;
+      if (!winMe){
+        /* 我防完轮到对手 —— 只要他存在任何「可达杀点」即必败。
+           注意不能用 forkCount>=2（一手双杀）当判据：单杀点 + 「防守又激活新杀点」
+           （zugzwang，例：堵住斜线缺口却把横线缺口托成可达）同样是必杀链，
+           必须枚举我方所有应手后逐一确认对手杀点是否清空。 */
+        const c1 = genCandidates(), l1 = landingSet(c1);
+        for (const d of c1){
+          if (l1.has(K(d.x, d.y)) && wouldWin(d, opp)){ oppKill = 1; break; }
+        }
+      }
+      removeP(bp.x, bp.y);
+      if (winMe || !oppKill){ if (++saves >= 2) break; }    // 能拆的应手 ≥2 即足够从容
+    }
+    removeP(r.x, r.y);
+    if (saves === 0){ removeP(o.land.x, o.land.y); return 2; }  // 对方某 r 完全无解 → 必败
+    if (saves === 1) tight = true;                             // 只能唯一精确应手 → 被施压
+  }
+  removeP(o.land.x, o.land.y);
+  return tight ? 1 : 0;
+}
+
+function aiChooseMove(){
+  const me = state.turn, opp = me === P1 ? P2 : P1;
+  const cands = genCandidates();
+  if (!cands.length) return null;
+
+  // 1) 候选投子点 → 落点（离散步进，快）；同一落点只保留最靠近中心的投法
+  const landMap = new Map();
+  for (const c of cands){
+    const l = settleDiscrete(c.x, c.y);
+    const k = K(l.x, l.y);
+    const rec = landMap.get(k);
+    if (!rec) landMap.set(k, {drop:c, land:l});
+    else if (Math.abs(c.x)+Math.abs(c.y) < Math.abs(rec.drop.x)+Math.abs(rec.drop.y)) rec.drop = c;
+  }
+  let options = [...landMap.values()];
+  if (!options.length) return null;
+
+  // 2) 一步取胜（用精确物理复核，避免预测与真实落点不符）
+  for (const o of options){
+    if (!wouldWin(o.land, me)) continue;
+    const ex = settleExact(o.drop.x, o.drop.y);
+    if (wouldWin(ex, me)) return o.drop;
+  }
+
+  // 3) 粗排（只看窗口价值 + 一点随机）
+  const noise = state.diff === 'easy' ? 26 : 2;
+  for (const o of options) o.v0 = deltaEval(o.land, me) + 0.95*deltaEval(o.land, opp) + (Math.random()-0.5)*noise;
+  options.sort((a,b)=> b.v0 - a.v0);
+
+  // 4) 简单：直接在较好的一批里随机
+  if (state.diff === 'easy'){
+    const n = Math.max(1, Math.min(6, Math.ceil(options.length * 0.35)));
+    return options[Math.floor(Math.random()*n)].drop;
+  }
+
+  /* 5) 对手的致命点：① 落此即连四 ② 落此即造活三（双威胁）
+        这两类点必须纳入深度评估，否则粗排没进前 K 就会漏防 */
+  const lands0 = landingSet(cands);
+  const pts0 = [];
+  for (const c of cands) if (lands0.has(K(c.x, c.y))) pts0.push(c);
+  const forced = [];
+  for (const c of pts0){
+    if (wouldWin(c, opp)){ forced.push(c); continue; }        // ① 立即杀点
+    addP(c.x, c.y, opp);
+    const c1 = genCandidates(), l1 = landingSet(c1);          // 落子会改变可达性，须重算
+    let n = 0;
+    for (const d of c1) if (l1.has(K(d.x, d.y)) && wouldWin(d, opp)){ n++; if (n >= 2) break; }
+    removeP(c.x, c.y);
+    if (n >= 2) forced.push(c);                                // ② 造活三（双威胁）的点
+  }
+
+  // 6) 对「粗排前 K + 致命点」做「威胁 / 造叉」深度评估
+  const K1 = state.diff === 'hard' ? 20 : 14;
+  const sel = new Map();
+  for (const o of options.slice(0, K1)) sel.set(K(o.land.x, o.land.y), o);
+  for (const c of forced){
+    const k = K(c.x, c.y);
+    if (!sel.has(k)) sel.set(k, { drop:c, land:{ x:c.x, y:c.y } });
+  }
+  let top = [...sel.values()];
+  for (const o of top) scoreOption(o, me, opp);
+  top.sort((a,b)=> b.v - a.v);
+
+  // 6) 困难：再加一层前瞻（对手应手的致命识别）。
+  //    注意：第二层【不能】对「对手的一般进攻收益」做线性扣分 —— 那会让 AI 过度保守、
+  //    不敢进攻；而本游戏先手优势很大，先手方一旦保守就把主动权拱手让人（实测先手 0:6）。
+  //    所以第二层只用于识别「致命」：对手能立即连四，或能一手造出活三/双威胁。
+  if (state.diff === 'hard'){
+    for (const o of top){
+      const best = oppBestReply(o, me, opp);
+      o.v2 = o.v - (best >= 1e5 ? 1e5 : 0) - (best >= 130 ? 700 : 0);
+    }
+    top.sort((a,b)=> b.v2 - a.v2);
+  }
+
+  /* 7) 多层威胁前瞻（用户方法论：普通也须看清「对手一手成三连/双杀、两三轮内必杀」，
+     只是强度分档：hard 全量宽搜，normal 窄搜前几名，easy 不看）。
+     命中 level2 → threat 标记，与 doom 同级一票否决。
+     覆盖范围按得分分层放宽（峰值/近优都尽量深挖，避免「v 中游但唯一安全」漏网）。 */
+  if (state.diff !== 'easy'){
+    const small = pts0.length <= (state.diff === 'hard' ? 12 : 10);
+    const C = small ? top.length : Math.min(top.length, state.diff === 'hard' ? 12 : 8);
+    for (let i = 0; i < C; i++){
+      const o = top[i];
+      const lt = lookaheadThreat(o, me, opp);
+      o._lt = lt;                             // 记录是否已深查（兜底时跳过重复）
+      if (lt >= 2){
+        o.threat = true;                        // 两步内必败链 → 与 doom 同级一票否决
+        const adj = -26000;
+        if (o.v2 !== undefined) o.v2 += adj; else o.v += adj;
+      } else if (lt === 1 && !o.doom){
+        /* 施压回避（结构特征：对手潜伏线）—— 这手会被对手逼到「唯一精确应手」，
+           主动让给对手合流舒适位。适度减分让 AI 布局期倾向走破坏位，而不是等必败。 */
+        o.pressure = true;
+        const pn = -PRESSURE_PEN;
+        if (o.v2 !== undefined) o.v2 += pn; else o.v += pn;
+      }
+    }
+    top.sort((a,b)=>(b.v2!==undefined?b.v2:b.v) - (a.v2!==undefined?a.v2:a.v));
+  }
+
+  // 8) 用精确物理复核前几名，保证「预测落点 == 真实落点」
+  //    （离散步进与精确物理在数千次抽样中结果一致，这里只对最终候选做保险校验）
+  const verify = top.slice(0, 5);
+  for (const o of verify){
+    const ex = settleExact(o.drop.x, o.drop.y);
+    if (ex.x !== o.land.x || ex.y !== o.land.y){
+      o.land = ex;                                   // 以精确物理结果为准
+      scoreOption(o, me, opp);
+      o.v2 = o.v; o.vT = 0; o.threat = false; o.pressure = false; o._lt = undefined;
+      if (state.diff === 'hard'){
+        const best = oppBestReply(o, me, opp);
+        o.v2 = o.v - (best >= 1e5 ? 1e5 : 0) - (best >= 130 ? 700 : 0);
+      }
+      if (state.diff !== 'easy'){
+        const lt2 = lookaheadThreat(o, me, opp);
+        o._lt = lt2;
+        if (lt2 >= 2){
+          o.threat = true;
+          o.vT = -26000;
+          if (o.v2 !== undefined) o.v2 += o.vT; else o.v += o.vT;
+        } else if (lt2 === 1 && !o.doom){
+          o.pressure = true;
+          const pn = -PRESSURE_PEN;
+          if (o.v2 !== undefined) o.v2 += pn; else o.v += pn;
+        }
+      }
+    }
+  }
+  const pick = state.diff === 'hard' ? 'v2' : 'v';
+  /* 一票否决：落子即送对手杀点（doom）或两步内必败链（threat）的候选永不选；
+     只有全部候选都被否决（必败局）才回退 */
+  let usable = top.filter(o => !o.doom && !o.threat);
+  if (!usable.length) usable = top;
+  let bestO = diversifyPick(usable, pick);
+  /* 峰值兜底深查（用户方法论②：得分峰值后的情况多考虑）：
+     威胁段只覆盖 top C，若真正被选中的点在 C 之外（前列全被否决后回退选中），
+     补查一次，命中必杀链则剔除重选。已深查过（_lt）的不重复查。 */
+  if (state.diff !== 'easy' && bestO._lt === undefined &&
+      lookaheadThreat(bestO, me, opp) >= 2){
+    bestO.threat = true;
+    const adj = -26000;
+    if (bestO.v2 !== undefined) bestO.v2 += adj; else bestO.v += adj;
+    usable = usable.filter(x => x !== bestO);
+    if (!usable.length) usable = top.filter(x => !x.doom);
+    bestO = diversifyPick(usable, pick);
+  }
+  if (bestO !== usable[0]){               // 复核落点（离散步进 vs 精确物理）
+    const ex = settleExact(bestO.drop.x, bestO.drop.y);
+    if (ex.x !== bestO.land.x || ex.y !== bestO.land.y) bestO.land = ex;
+  }
+  return bestO.drop;
+}
+
+/* ==========================================================================
+   游戏状态
+   ========================================================================== */
+const state = {
+  mode:'hh', diff:'normal',
+  turn:P1,
+  phase:'idle',          // idle | falling | over
+  winner:0, winCells:null,
+  moveCount:0, lastMove:null,
+  opener:P1,             // 本局先手（悔棋撤空盘 / 联机换先时用于复位回合）
+  mmPaused:false, mmDelay:420,
+  thinking:false
+};
+let moving = null;       // 正在下落的棋子
+let effects = [];        // 落点涟漪
+let spawnT = new Map();  // "x,y" -> 生成时刻（弹出动画）
+let moveNo = new Map();  // "x,y" -> 第几手
+let danger = new Map();  // "空白延伸格" -> {owner, level}  level 1=二连延伸 2=三连取胜延伸
+let history = [];        // 对局记录 [{n, owner, drop:{x,y}, land:{x,y}}]
+let hoverCell = null, predictCell = null, predictKey = '';
+
+const isHuman = (owner)=>{
+  switch (state.mode){
+    case 'hh': return true;
+    case 'hm': return owner === P1;
+    case 'mh': return owner === P2;
+    case 'mm': return false;
+    case 'net': return net.connected && owner === net.myColor;
+  }
+};
+
+function resetGame(){
+  occ = new Map();
+  occ.set(K(0,0), BLOCK);
+  state.turn = P1;
+  state.opener = P1;
+  state.phase = 'idle';
+  state.winner = 0; state.winCells = null;
+  state.moveCount = 0; state.lastMove = null;
+  state.thinking = false;
+  moving = null; effects = []; spawnT = new Map();
+  moveNo = new Map(); danger = new Map(); history = [];
+  predictKey = ''; predictCell = null;
+  clearTimeout(aiTimer); aiTimer = null;
+  banner.classList.remove('show');
+  updateUI();
+  maybeAI();            // 机-人 / 机-机 模式下，开局即由 AI 落第一手
+}
+
+/* 按指定先手开新局（联机「下轮先手」规则、断线恢复等用） */
+function newGame(firstOwner){
+  resetGame();
+  state.opener = firstOwner;
+  state.turn = firstOwner;
+  net.lobby = false;
+  updateUI();
+  maybeAI();
+}
+
+/* ==========================================================================
+   悔棋
+   ========================================================================== */
+/* 撤回最后 count 手（count 由调用方按规则算好）；返回是否执行 */
+function undoMoves(count){
+  if (!count || count < 1) return false;
+  if (state.phase === 'falling') return false;
+  if (count > history.length) count = history.length;
+  if (!count) return false;
+  const removed = history.slice(-count);
+  for (const r of removed) effects.push({ kind:'undo', x:r.land.x, y:r.land.y, owner:r.owner, t:0 });
+  occ = new Map(); occ.set(K(0,0), BLOCK);
+  const keep = history.slice(0, -count);
+  moveNo = new Map();
+  for (const h of keep){ addP(h.land.x, h.land.y, h.owner); moveNo.set(K(h.land.x,h.land.y), h.n); }
+  history = keep;
+  state.moveCount = keep.length;
+  state.lastMove = keep.length ? { x:keep[keep.length-1].land.x, y:keep[keep.length-1].land.y } : null;
+  state.phase = 'idle'; state.winner = 0; state.winCells = null;
+  banner.classList.remove('show');
+  state.turn = keep.length ? (keep[keep.length-1].owner === P1 ? P2 : P1) : (state.opener || P1);
+  clearTimeout(aiTimer); aiTimer = null;
+  computeDanger(); updateUI();
+  return true;
+}
+
+/* 悔棋按钮：自己的回合悔 2 手（对手一手＋自己一手）；对方回合悔 1 手。
+   撤完必须回到自己的回合（否则视为无意义）。
+   单机结算画面（over）可点悔棋：撤回分出胜负的最后一手，回到对局。 */
+function undoRequest(){
+  if (state.phase === 'falling'){ toast('落子动画中不能悔棋'); return; }
+  if (state.phase === 'over'){
+    if (state.mode === 'net'){ toast('联机本局已结束 · 请再来一局'); return; }
+    if (!history.length){ toast('没有可悔的棋'); return; }
+    undoMoves(1);
+    toast('已撤销终局手，可继续下棋');
+    return;
+  }
+  let me;
+  if (state.mode === 'net'){
+    if (!net.connected || net.lobby){ return; }
+    if (!net.rules.allowUndo){ toast('本局房规：不允许悔棋'); return; }
+    me = net.myColor;
+  } else if (state.mode === 'mm'){
+    toast('机机模式不可悔棋'); return;
+  } else if (state.mode === 'hh'){
+    // 人人：双方共用悔棋，固定悔 1 手（撤回最后一手，让刚落子的一方重新思考）
+    if (!history.length){ toast('没有可悔的棋'); return; }
+    if (undoMoves(1)) toast('悔棋 1 手');
+    return;
+  } else {
+    me = state.mode === 'hm' ? P1 : P2;    // 人机：只有人可悔
+  }
+  if (!history.length){ toast('没有可悔的棋'); return; }
+  const count = (state.turn === me) ? Math.min(2, history.length) : Math.min(1, history.length);
+  const after = history.length - count;
+  const afterTurn = after === 0 ? (state.opener || P1) : (history[after-1].owner === P1 ? P2 : P1);
+  if (afterTurn !== me){ toast('没有可悔的棋'); return; }
+  undoMoves(count);
+  if (state.mode === 'net') netSend({ type:'undo', count });
+  toast('悔棋 ' + count + ' 手');
+}
+
+/* 当前悔棋按钮是否可用（updateUI 用） */
+function canUndo(){
+  if (state.mode === 'mm') return false;
+  if (state.phase === 'falling') return false;
+  if (state.phase === 'over'){
+    if (state.mode === 'net') return false;
+    return history.length > 0;                     // 单机结算可悔（撤终局手）
+  }
+  if (state.mode === 'net'){
+    if (!net.connected || net.lobby) return false;
+    if (!net.rules.allowUndo) return false;
+  }
+  if (!history.length) return false;
+  return true;
+}
+
+function placePiece(cell, owner, remote){
+  if (state.phase !== 'idle') return false;
+  if (state.mode === 'net'){
+    if (!net.connected || net.lobby) return false;
+    if (!remote && owner !== net.myColor)  return false;   // 本地发起：只能下自己的子
+    if ( remote && owner !== net.oppColor) return false;   // 远端同步：只能下对方的子
+  }
+  if (cell.x === 0 && cell.y === 0) { toast('中央是固定块'); return false; }
+  if (!isFree(cell.x, cell.y)) { toast('该格已有棋子'); return false; }
+  state.phase = 'falling';
+  moving = {
+    x:cell.x, y:cell.y, vx:0, vy:0, owner,
+    acc:0, steps:0, flying:false, lastSnap:'', repeat:0, drop:cell, born:performance.now()
+  };
+  updateUI();
+  return true;
+}
+
+function finishMove(cx, cy){
+  const o = moving.owner;
+  addP(cx, cy, o);
+  spawnT.set(K(cx,cy), performance.now());
+  effects.push({x:cx, y:cy, t:0, owner:o});
+  state.lastMove = {x:cx, y:cy};
+  state.moveCount++;
+  moveNo.set(K(cx,cy), state.moveCount);
+  history.push({n:state.moveCount, owner:o, drop:{x:moving.drop.x, y:moving.drop.y}, land:{x:cx, y:cy}});
+  const line = checkWin(cx, cy, o);
+  moving = null;
+  computeDanger();
+  /* --- 联机：落定后同步 ---
+     自己的子 → 发送「第几手 + 投点 + 实际落点」
+     对方的子 → 校验本地物理演算的落点是否与对方报告一致（物理是确定性的，
+                 不一致仅可能出现在超时保护截断等极端情况），以先落子方为准 */
+  if (net.connected){
+    const h = history[history.length - 1];
+    if (o === net.myColor){
+      netSend({ type:'move', n:h.n, drop:h.drop, land:h.land });
+    } else if (netPending && (netPending.x !== cx || netPending.y !== cy)){
+      applyCorrection(h.n, netPending);
+      netSend({ type:'correction', n:h.n, land:netPending });
+    }
+    netPending = null;
+  }
+  if (line){
+    state.phase = 'over'; state.winner = o; state.winCells = line;
+    showBanner(o);
+  } else {
+    state.phase = 'idle';
+    state.turn = o === P1 ? P2 : P1;
+    maybeAI();
+  }
+  updateUI();
+}
+
+/* 实时推进下落中的棋子 */
+function updateMoving(dt){
+  if (!moving) return;
+  if (!moving.flying){
+    const cx = Math.round(moving.x), cy = Math.round(moving.y);
+    const g = gravAt(cx, cy);
+    if ((g[0]===0 && g[1]===0) || !isFree(cx+g[0], cy+g[1])) { finishMove(cx, cy); return; }
+    moving.x = cx; moving.y = cy; moving.vx = 0; moving.vy = 0;
+    moving.flying = true; moving.steps = 0; moving.acc = 0;
+  }
+  const rate = moving.steps > 500 ? TSCALE_FAR : TSCALE;
+  let acc = moving.acc + dt * rate, hit = false, n = 0;
+  while (acc >= DT && n < 4000){
+    acc -= DT; n++;
+    if (physStep(moving)) { hit = true; break; }
+    if (++moving.steps > MAX_STEPS){ hit = 'timeout'; break; }
+  }
+  moving.acc = acc;
+  if (hit){
+    let nx = Math.round(moving.x), ny = Math.round(moving.y);
+    const bg = backDir(gravAt(nx, ny), moving);
+    let back = 0;
+    while (back < 12 && !cellPlayable(nx, ny)) { nx += bg[0]; ny += bg[1]; back++; }
+    const key = K(nx, ny);
+    moving.repeat = (key === moving.lastSnap) ? moving.repeat + 1 : 0;
+    moving.lastSnap = key;
+    moving.x = nx; moving.y = ny; moving.vx = 0; moving.vy = 0;
+    moving.flying = false; moving.acc = 0;
+    if (hit === 'timeout' || moving.repeat >= 2) finishMove(nx, ny);
+  }
+}
+
+/* AI 调度 */
+let aiTimer = null;
+function maybeAI(){
+  clearTimeout(aiTimer); aiTimer = null;
+  if (state.phase !== 'idle') return;
+  if (state.mode === 'net') { state.thinking = false; return; }   // 联机无 AI
+  if (isHuman(state.turn)) { state.thinking = false; updateUI(); return; }
+  if (state.mode === 'mm' && state.mmPaused) { state.thinking = false; updateUI(); return; }
+  state.thinking = true; updateUI();
+  const delay = state.mode === 'mm' ? state.mmDelay : 260;
+  aiTimer = setTimeout(()=>{
+    aiTimer = null;
+    if (state.phase !== 'idle' || isHuman(state.turn)) { state.thinking = false; updateUI(); return; }
+    const cell = aiChooseMove();
+    state.thinking = false;
+    if (cell) placePiece(cell, state.turn);
+    else { state.phase = 'over'; updateUI(); }
+    updateUI();
+  }, delay);
+}
+
+/* ==========================================================================
+   渲染
+   ========================================================================== */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', ()=>{ resize(); draw(); });
+
+const cam = { x:0, y:0, scale:46, target:46, anchor:null };
+const BASE_SCALE = 46;
+function w2s(wx, wy){ return { x:(wx-cam.x)*cam.scale + W/2, y:H/2 - (wy-cam.y)*cam.scale }; }
+function s2w(sx, sy){ return { x:(sx-W/2)/cam.scale + cam.x,   y:cam.y - (sy-H/2)/cam.scale }; }
+
+function fillRegion(xa, xb, ya, yb, color, v){
+  const x = Math.max(v.x0, xa), X = Math.min(v.x1, xb);
+  const y = Math.max(v.y0, ya), Y = Math.min(v.y1, yb);
+  if (X <= x || Y <= y) return;
+  const p = w2s(x, Y);
+  ctx.fillStyle = color;
+  ctx.fillRect(p.x, p.y, (X-x)*cam.scale, (Y-y)*cam.scale);
+}
+
+// 危险提示小点：等级1 一个点，等级2 两个点
+const DANGER_MIX = '#8e5bd0';   // 同一格两方同级危险 → 紫色
+function drawDangerDots(px, py, info, r){
+  const a = info.a, b = info.b;
+  const mixed = !!(b && b.level === a.level);        // 大小一致 → 紫色
+  const col = mixed ? DANGER_MIX : COL[a.owner].base; // 否则取等级高的一方（大点覆盖小点）
+  ctx.save();
+  // 外圈：标出这是一格「延伸空格」
+  ctx.beginPath(); ctx.arc(px, py, r*0.60, 0, Math.PI*2);
+  ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = Math.max(1.4, r*0.05); ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (a.hollow){
+    /* 空心圈：只保留上面那个外圈，中间完全留空（表示看得到但落不进去，子会滑走） */
+    ctx.restore();
+    return;
+  }
+  // 实心点：等级越高越大
+  const dr = a.level >= 2 ? Math.max(3, r*0.27) : Math.max(2.2, r*0.18);
+  ctx.beginPath(); ctx.arc(px, py, dr, 0, Math.PI*2);
+  ctx.fillStyle = col; ctx.fill();
+  ctx.lineWidth = Math.max(1, r*0.04); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
+  ctx.restore();
+}
+
+// 棋子中央的手数序号
+function drawMoveNumber(px, py, n, s){
+  ctx.save();
+  ctx.font = 'bold ' + Math.round(Math.max(8, s*0.32)) + 'px ui-monospace,Menlo,Consolas,monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth   = Math.max(1.4, s*0.055);
+  ctx.strokeStyle = 'rgba(0,0,0,.40)';
+  ctx.strokeText(String(n), px, py);
+  ctx.fillStyle   = 'rgba(255,255,255,.96)';
+  ctx.fillText(String(n), px, py);
+  ctx.restore();
+}
+
+function drawPieceAt(wx, wy, owner, mul, alpha, now){
+  const p = w2s(wx, wy);
+  const s = cam.scale * (mul || 1);
+  const r = R * s;
+  if (p.x < -r-20 || p.x > W+r+20 || p.y < -r-20 || p.y > H+r+20) return;
+  const c = COL[owner];
+  ctx.save();
+  if (alpha !== undefined) ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(p.x - r*0.34, p.y - r*0.40, r*0.15, p.x, p.y, r*1.06);
+  g.addColorStop(0, c.light);
+  g.addColorStop(0.55, c.base);
+  g.addColorStop(1, c.dark);
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.lineWidth = Math.max(1, s*0.022);
+  ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(p.x - r*0.30, p.y - r*0.34, r*0.30, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,.34)'; ctx.fill();
+  ctx.restore();
+}
+
+function drawArrow(px, py, dx, dy, len, color){
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, cam.scale*0.028);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(px - dx*len/2, py - dy*len/2);
+  ctx.lineTo(px + dx*len/2, py + dy*len/2);
+  ctx.stroke();
+  const h = len*0.34;
+  ctx.beginPath();
+  ctx.moveTo(px + dx*len/2, py + dy*len/2);
+  ctx.lineTo(px + dx*len/2 - dx*h - dy*h*0.55, py + dy*len/2 - dy*h + dx*h*0.55);
+  ctx.lineTo(px + dx*len/2 - dx*h + dy*h*0.55, py + dy*len/2 - dy*h - dx*h*0.55);
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+}
+
+let lastFrame = performance.now();
+function draw(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastFrame)/1000);
+  lastFrame = now;
+
+  /* --- 缩放平滑 --- */
+  if (Math.abs(cam.target - cam.scale) > 1e-4){
+    cam.scale += (cam.target - cam.scale) * 0.24;
+    if (Math.abs(cam.target - cam.scale) < cam.target * 0.002) cam.scale = cam.target;
+    if (cam.anchor){
+      cam.x = cam.anchor.w.x - (cam.anchor.s.x - W/2)/cam.scale;
+      cam.y = cam.anchor.w.y + (cam.anchor.s.y - H/2)/cam.scale;
+    }
+  } else if (cam.scale !== cam.target){ cam.scale = cam.target; cam.anchor = null; }
+
+  /* --- 镜头跟随 --- */
+  if (moving && optFollow.checked){
+    const s = w2s(moving.x, moving.y);
+    const dx = s.x - W/2, dy = s.y - H/2;
+    const lx = W*0.26, ly = H*0.26;
+    const ox = Math.abs(dx) - lx, oy = Math.abs(dy) - ly;
+    if (ox > 0) cam.x += Math.sign(dx)*ox/cam.scale*0.11;
+    if (oy > 0) cam.y -= Math.sign(dy)*oy/cam.scale*0.11;
+  }
+
+  /* --- 特效时间 --- */
+  for (let i=effects.length-1; i>=0; i--){
+    effects[i].t += dt;
+    if (effects[i].t > 0.5) effects.splice(i,1);
+  }
+
+  /* --- 背景 --- */
+  ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
+
+  const tl = s2w(0,0), br = s2w(W,H);
+  const v = { x0:tl.x, x1:br.x, y0:br.y, y1:tl.y };
+
+  /* --- 分区底色 --- */
+  fillRegion(-0.5, INF, 0.5, INF,  C.qNE, v);
+  fillRegion( 0.5, INF, -INF, 0.5, C.qSE, v);
+  fillRegion(-INF, 0.5, -INF, -0.5, C.qSW, v);
+  fillRegion(-INF, -0.5, -0.5, INF, C.qNW, v);
+
+  /* --- 坐标轴高亮（范围裁剪到可视区，避免超大矩形） --- */
+  ctx.fillStyle = 'rgba(120,132,152,.10)';
+  let a1 = w2s(v.x0, 0.5), a2 = w2s(v.x1, -0.5);
+  ctx.fillRect(a1.x, a1.y, a2.x - a1.x, a2.y - a1.y);
+  a1 = w2s(-0.5, v.y1); a2 = w2s(0.5, v.y0);
+  ctx.fillRect(a1.x, a1.y, a2.x - a1.x, a2.y - a1.y);
+
+  /* --- 网格线 --- */
+  let step = 1;
+  if (cam.scale < 4) step = 100;
+  else if (cam.scale < 9) step = 25;
+  else if (cam.scale < 26) step = 5;
+  const s = cam.scale;
+  if (s >= 2.2){
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = C.grid;
+    ctx.beginPath();
+    for (let x = Math.floor(v.x0/step)*step; x <= v.x1; x += step){
+      const px = Math.round(w2s(x-0.5, 0).x) + 0.5;
+      ctx.moveTo(px, 0); ctx.lineTo(px, H);
+    }
+    for (let y = Math.floor(v.y0/step)*step; y <= v.y1; y += step){
+      const py = Math.round(w2s(0, y-0.5).y) + 0.5;
+      ctx.moveTo(0, py); ctx.lineTo(W, py);
+    }
+    ctx.stroke();
+  }
+
+  /* --- 分区重力箭头（间隔随缩放按 10 倍递增，缩得再小也保留标注）--- */
+  if (s >= 1.2){
+    let gstep = 5;
+    while (gstep * s < 26 && gstep < 1e7) gstep *= 10;     // 箭头最小像素间距
+    const len = Math.min(Math.max(s * gstep * 0.22, 7), 22);
+    for (let x = Math.ceil(v.x0/gstep)*gstep; x <= v.x1; x += gstep){
+      for (let y = Math.ceil(v.y0/gstep)*gstep; y <= v.y1; y += gstep){
+        const g = gravAt(x, y);
+        if (g[0]===0 && g[1]===0) continue;
+        const p = w2s(x, y);
+        ctx.globalAlpha = 0.30;
+        drawArrow(p.x, p.y, g[0], -g[1], len, '#5c6472');
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  /* --- 坐标数字（间隔自适应：整十 → 整百 → 整千，缩小时不再整片消失）--- */
+  if (optCoord.checked){
+    let cstep = 1;
+    const needPx = st => 24 + String(Math.abs(st)).length * 6;   // 估算标签占用宽度
+    while (cstep * s < needPx(cstep) && cstep < 1e7) cstep *= 10;
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.fillStyle = 'rgba(90,98,112,.55)';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    for (let x = Math.ceil(v.x0/cstep)*cstep; x <= v.x1; x += cstep){
+      for (let y = Math.ceil(v.y0/cstep)*cstep; y <= v.y1; y += cstep){
+        const p = w2s(x-0.5, y+0.5);
+        ctx.fillText(x + ',' + y, p.x + 3, p.y + 2);
+      }
+    }
+  }
+
+  /* --- 固定块 --- */
+  {
+    const p = w2s(-0.5, 0.5);
+    const sz = s;
+    ctx.fillStyle = '#4a5058'; ctx.fillRect(p.x, p.y, sz, sz);
+    ctx.strokeStyle = 'rgba(255,255,255,.30)'; ctx.lineWidth = Math.max(1, s*0.03);
+    ctx.strokeRect(p.x + s*0.10, p.y + s*0.10, sz - s*0.20, sz - s*0.20);
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
+    ctx.strokeRect(p.x + 0.5, p.y + 0.5, sz - 1, sz - 1);
+    if (s >= 26){
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.font = 'bold ' + Math.round(s*0.26) + 'px ui-monospace,monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('0,0', p.x + sz/2, p.y + sz/2);
+    }
+  }
+
+  /* --- 已有棋子 --- */
+  for (const [k, o] of occ){
+    if (o === BLOCK) continue;
+    const i = k.indexOf(',');
+    const x = +k.slice(0,i), y = +k.slice(i+1);
+    let mul = 1;
+    const st = spawnT.get(k);
+    if (st !== undefined){
+      const e = (now - st)/170;
+      if (e < 1){ const t = Math.max(0, e); mul = 1 - 0.55*(1-t)*(1-t) + 0.18*Math.sin(t*Math.PI); }
+    }
+    drawPieceAt(x, y, o, mul);
+    // 手数序号
+    if (showNumber && s >= 15){
+      const mn = moveNo.get(k);
+      if (mn !== undefined){
+        const p = w2s(x, y);
+        drawMoveNumber(p.x, p.y, mn, s*mul);
+      }
+    }
+  }
+
+  /* --- 危险提示：标在延伸的空白格上，按阵营着色 --- */
+  if (showDanger && s >= 13){
+    for (const [k, info] of danger){
+      const i = k.indexOf(',');
+      const x = +k.slice(0,i), y = +k.slice(i+1);
+      const p = w2s(x, y);
+      drawDangerDots(p.x, p.y, info, R*s);
+    }
+  }
+
+  /* --- 最后一手标记 --- */
+  if (state.lastMove && !state.winCells){
+    const p = w2s(state.lastMove.x, state.lastMove.y);
+    ctx.beginPath(); ctx.arc(p.x, p.y, R*s + Math.max(2, s*0.055), 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(35,40,50,.42)'; ctx.lineWidth = Math.max(1.2, s*0.035); ctx.stroke();
+  }
+
+  /* --- 落点涟漪 / 悔棋撤子残影 --- */
+  for (const e of effects){
+    if (e.kind === 'undo'){
+      const t = e.t/0.45;                       // 0→1：棋子缩小并向上飘散淡出
+      const lift = Math.min(1, t*1.5);
+      const mul = Math.max(0.06, 1 - Math.max(0,(t-0.15))/0.85);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 0.9*(1-t));
+      ctx.translate(0, -22*lift);
+      drawPieceAt(e.x, e.y, e.owner, mul);
+      ctx.restore();
+      continue;
+    }
+    const p = w2s(e.x, e.y);
+    const t = e.t/0.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, R*s*(1 + t*1.5), 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(60,66,78,' + (0.42*(1-t)).toFixed(3) + ')';
+    ctx.lineWidth = Math.max(1, s*0.05*(1-t));
+    ctx.stroke();
+  }
+
+  /* --- 悬停预览 --- */
+  if (state.phase === 'idle' && isHuman(state.turn) && hoverCell){
+    const hc = hoverCell;
+    if (isFree(hc.x, hc.y) && !(hc.x===0 && hc.y===0)){
+      const p = w2s(hc.x, hc.y);
+      ctx.save();
+      ctx.setLineDash([Math.max(3,s*0.12), Math.max(3,s*0.09)]);
+      ctx.strokeStyle = 'rgba(40,46,58,.55)'; ctx.lineWidth = Math.max(1, s*0.03);
+      ctx.strokeRect(p.x - s/2 + s*0.06, p.y - s/2 + s*0.06, s - s*0.12, s - s*0.12);
+      ctx.restore();
+      drawPieceAt(hc.x, hc.y, state.turn, 1, 0.42);
+      if (optPredict.checked && predictCell && !(predictCell.x===hc.x && predictCell.y===hc.y)){
+        const q = w2s(predictCell.x, predictCell.y);
+        ctx.save();
+        ctx.setLineDash([Math.max(3,s*0.10), Math.max(3,s*0.08)]);
+        ctx.beginPath(); ctx.arc(q.x, q.y, R*s, 0, Math.PI*2);
+        const cc = COL[state.turn];
+        ctx.strokeStyle = cc.base; ctx.globalAlpha = 0.75;
+        ctx.lineWidth = Math.max(1.2, s*0.035); ctx.stroke();
+        ctx.restore();
+        // 连线
+        ctx.save();
+        ctx.globalAlpha = 0.28; ctx.setLineDash([4,4]);
+        ctx.strokeStyle = cc.base; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  /* --- 下落中的棋子 --- */
+  if (moving){
+    const p = w2s(moving.x, moving.y);
+    const sp = Math.hypot(moving.vx, moving.vy);
+    if (sp > 0.6){
+      const ux = moving.vx/sp, uy = moving.vy/sp;
+      ctx.save(); ctx.globalAlpha = 0.16;
+      for (let i=1;i<=3;i++){
+        drawPieceAt(moving.x - ux*0.16*i, moving.y - uy*0.16*i, moving.owner, 1 - 0.06*i);
+      }
+      ctx.restore();
+    }
+    drawPieceAt(moving.x, moving.y, moving.owner);
+    // 起点标记
+    const d0 = w2s(moving.drop.x, moving.drop.y);
+    ctx.save(); ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#5c6472'; ctx.lineWidth = 1.2; ctx.setLineDash([3,3]);
+    ctx.strokeRect(d0.x - s/2, d0.y - s/2, s, s);
+    ctx.restore();
+  }
+
+  /* --- 胜利连线 --- */
+  if (state.winCells && state.winCells.length){
+    const a = w2s(state.winCells[0][0], state.winCells[0][1]);
+    const b = w2s(state.winCells[state.winCells.length-1][0], state.winCells[state.winCells.length-1][1]);
+    const cc = COL[state.winner];
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = cc.base; ctx.globalAlpha = 0.30;
+    ctx.lineWidth = R*s*1.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.lineWidth = Math.max(2, s*0.07);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* --- 思考提示 --- */
+  if (state.thinking){
+    ctx.font = '12px -apple-system,"PingFang SC",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(40,46,58,.55)';
+    ctx.fillText('思考中…', W/2, H - 26);
+  }
+}
+
+/* 主循环 */
+function loop(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastFrame)/1000);
+  if (state.phase === 'falling') updateMoving(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ==========================================================================
+   交互
+   ========================================================================== */
+let dragging = false, dragMoved = 0, lastPt = null;
+let lastClickT = 0, lastClickP = null;
+let mouseS = {x:0, y:0};
+
+function mouseOf(e){
+  const r = cv.getBoundingClientRect();
+  return { x:e.clientX - r.left, y:e.clientY - r.top };
+}
+function updateHover(pt){
+  mouseS = pt;
+  const w = s2w(pt.x, pt.y);
+  const c = { x:Math.round(w.x), y:Math.round(w.y) };
+  if (!hoverCell || hoverCell.x !== c.x || hoverCell.y !== c.y){
+    hoverCell = c;
+    const k = K(c.x, c.y);
+    if (optPredict.checked && isFree(c.x,c.y) && !(c.x===0&&c.y===0) && state.phase==='idle' && isHuman(state.turn)){
+      if (k !== predictKey){ predictKey = k; predictCell = settleExact(c.x, c.y); }
+    } else { predictCell = null; predictKey = ''; }
+  }
+}
+
+cv.addEventListener('mousedown', e=>{
+  if (e.button !== 0) return;
+  dragging = true; dragMoved = 0; lastPt = mouseOf(e);
+  cv.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e=>{
+  const pt = mouseOf(e);
+  if (dragging && lastPt){
+    const dx = pt.x - lastPt.x, dy = pt.y - lastPt.y;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    if (dragMoved > 3){
+      cam.x -= dx / cam.scale;
+      cam.y += dy / cam.scale;
+      if (cam.anchor) cam.anchor = { w: s2w(pt.x, pt.y), s: {x:pt.x, y:pt.y} };
+    }
+  }
+  lastPt = pt;
+  if (!dragging) updateHover(pt);
+});
+window.addEventListener('mouseup', e=>{
+  if (e.button !== 0) return;
+  const wasDragging = dragging;
+  dragging = false; cv.classList.remove('grabbing');
+  if (!wasDragging) return;
+  const pt = mouseOf(e);
+  if (dragMoved > 6) { lastClickT = 0; return; }   // 拖动过，不算点击
+  const now = performance.now();
+  if (lastClickT && now - lastClickT < 340 &&
+      Math.abs(pt.x - lastClickP.x) < 7 && Math.abs(pt.y - lastClickP.y) < 7){
+    lastClickT = 0;
+    onDoubleClick(pt);
+  } else {
+    lastClickT = now; lastClickP = pt;
+  }
+});
+cv.addEventListener('mouseleave', ()=>{ hoverCell = null; predictCell = null; predictKey=''; });
+
+function onDoubleClick(pt){
+  if (state.phase !== 'idle') return;
+  if (state.mode === 'net' && !net.connected){ toast('请先创建或加入房间'); return; }
+  if (state.mode === 'net' && net.lobby){ toast('请先点「准备」开始对局'); return; }
+  if (!isHuman(state.turn)) { toast('现在是 AI 回合'); return; }
+  const w = s2w(pt.x, pt.y);
+  const cell = { x:Math.round(w.x), y:Math.round(w.y) };
+  if (cell.x === 0 && cell.y === 0){ toast('中央是固定块，不能落子'); return; }
+  if (!isFree(cell.x, cell.y)){ toast('该格已有棋子'); return; }
+  placePiece(cell, state.turn);
+}
+
+cv.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const pt = mouseOf(e);
+  const w = s2w(pt.x, pt.y);
+  const f = Math.exp(-e.deltaY * 0.0016);
+  cam.target = Math.max(3.2, Math.min(170, cam.target * f));
+  cam.anchor = { w:w, s:{x:pt.x, y:pt.y} };
+  showZoom(Math.round(cam.target / BASE_SCALE * 100));
+}, { passive:false });
+
+cv.addEventListener('contextmenu', e=> e.preventDefault());
+
+window.addEventListener('keydown', e=>{
+  if (e.code === 'Space'){ e.preventDefault(); homeView(); }
+  else if (e.key === 'n' || e.key === 'N'){ userReset(); }
+  else if (e.key === 'Escape'){ help.classList.add('hidden'); load.classList.add('hidden'); }
+});
+
+function homeView(){
+  cam.x = 0; cam.y = 0; cam.target = BASE_SCALE; cam.anchor = null;
+  showZoom(100);
+}
+
+/* ==========================================================================
+   UI
+   ========================================================================== */
+const panel = document.getElementById('panel');
+const banner = document.getElementById('banner');
+const help = document.getElementById('help');
+const turnDot = document.getElementById('turnDot');
+const turnText = document.getElementById('turnText');
+const moveCount = document.getElementById('moveCount');
+const zoomFloat = document.getElementById('zoomFloat');
+let zoomTimer = null;
+/* 缩放提示：仅数值变化时在右下角短暂显示 */
+function showZoom(pct){
+  zoomFloat.textContent = '缩放 ' + pct + '%';
+  zoomFloat.classList.add('show');
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(()=> zoomFloat.classList.remove('show'), 1200);
+}
+const mmRow = document.getElementById('mmRow');
+const mmPause = document.getElementById('mmPause');
+const mmSpeed = document.getElementById('mmSpeed');
+const optPredict = document.getElementById('optPredict');
+const optFollow = document.getElementById('optFollow');
+const optCoord = document.getElementById('optCoord');
+const optNumber = document.getElementById('optNumber');
+const optDanger = document.getElementById('optDanger');
+const tab = document.getElementById('tab');
+const bnCopy = document.getElementById('bnCopy');
+const undoBtn = document.getElementById('undoBtn');
+
+// 绘制开关（用普通变量而非直接读 DOM，避免初始化顺序问题）
+let showNumber = false, showDanger = true;
+
+let toastTimer = null;
+function toast(msg){
+  turnText.textContent = msg;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(updateUI, 1100);
+}
+
+function updateUI(){
+  const t = state.turn;
+  turnDot.style.background = COL[t].base;
+  if (state.phase === 'over' && state.winner){
+    turnText.textContent = COL[state.winner].name + '获胜';
+  } else if (state.mode === 'net' && !net.connected){
+    turnText.textContent = '联机 · 未连接';
+  } else if (state.mode === 'net' && net.lobby){
+    turnText.textContent = '准备大厅 · 等待开局';
+  } else if (state.phase === 'falling'){
+    turnText.textContent = COL[t].name + '落子中…';
+  } else if (state.thinking){
+    turnText.textContent = 'AI 思考中…';
+  } else {
+    const who = state.mode === 'net'
+      ? (t === net.myColor ? '我' : '对方')
+      : (isHuman(t) ? '你' : 'AI');
+    turnText.textContent = COL[t].name + '回合 · ' + who +
+      (state.mode === 'net' && net.oppState === 'offline' ? '（对方已断线）' : '');
+  }
+  moveCount.textContent = '落子 ' + state.moveCount;
+
+  const needAI = state.mode !== 'hh' && state.mode !== 'net';
+  document.querySelectorAll('#diffSeg button').forEach(b=> b.disabled = !needAI);
+  mmRow.classList.toggle('show', state.mode === 'mm');
+  mmPause.textContent = state.mmPaused ? '继续' : '暂停';
+  netBoxEl.classList.toggle('show', state.mode === 'net');
+  undoBtn.disabled = !canUndo();
+  undoBtn.title = state.mode === 'mm' ? '机机模式不可悔棋'
+    : (state.mode === 'net' && (!net.connected || net.lobby || !net.rules.allowUndo))
+      ? (state.mode === 'net' && net.connected && !net.lobby && !net.rules.allowUndo ? '本局房规：不允许悔棋' : '联机大厅中不可悔棋')
+      : '悔棋：自己回合悔 2 手，对方回合悔 1 手';
+  refreshNetUI();
+  refreshPrep();
+}
+
+/* 联机模式下，重新开局：按「下轮先手」房规由本端算好先手并广播，再本地开局。
+   房规「重开方后手」→ 点重开的一方让对方先走；单机则直接红先。 */
+function userReset(){
+  if (net.connected){
+    if (net.lobby) return;                           // 大厅中无需重开
+    const first = calcFirstByRule(net.side, state.winner);
+    netSend({ type:'restart', by:net.side, winner:state.winner, firstOwner:first });
+    newGame(first);
+    updateUI(); refreshPrep();
+  } else {
+    resetGame();
+  }
+}
+
+document.getElementById('modeSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.mode === 'net' && !net.available){
+    toast('联机不可用：请通过联机服务器打开本页');
+    return;
+  }
+  if (state.mode === 'net' && b.dataset.mode !== 'net') netLeave(true);   // 切走即断开
+  document.querySelectorAll('#modeSeg button').forEach(x=> x.classList.remove('on'));
+  b.classList.add('on');
+  state.mode = b.dataset.mode;
+  state.mmPaused = false;
+  resetGame();
+});
+document.getElementById('diffSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  document.querySelectorAll('#diffSeg button').forEach(x=> x.classList.remove('on'));
+  b.classList.add('on');
+  state.diff = b.dataset.diff;
+});
+document.getElementById('btnNew').addEventListener('click', userReset);
+document.getElementById('btnHome').addEventListener('click', homeView);
+document.getElementById('btnHelp').addEventListener('click', ()=> help.classList.remove('hidden'));
+document.getElementById('helpClose').addEventListener('click', ()=> help.classList.add('hidden'));
+help.addEventListener('click', e=>{ if (e.target === help) help.classList.add('hidden'); });
+document.getElementById('bnAgain').addEventListener('click', userReset);
+undoBtn.addEventListener('click', undoRequest);
+mmPause.addEventListener('click', ()=>{
+  state.mmPaused = !state.mmPaused;
+  if (!state.mmPaused && state.phase === 'idle') maybeAI();
+  updateUI();
+});
+/* --- 面板折叠 / 展开 --- */
+function foldPanel(fold){
+  panel.classList.toggle('folded', fold);
+  tab.classList.toggle('show', fold);
+}
+document.getElementById('btnFold').addEventListener('click', ()=> foldPanel(true));
+tab.addEventListener('click', ()=> foldPanel(false));
+
+/* --- 对局记录复制 --- */
+const MODE_CN = {hh:'人 · 人', hm:'人 · 机', mh:'机 · 人', mm:'机 · 机'};
+const DIFF_CN = {easy:'简单', normal:'普通', hard:'困难'};
+function buildRecord(){
+  const L = [];
+  L.push('重力四子棋 · 对局记录');
+  L.push('模式：' + MODE_CN[state.mode] + '　AI 强度：' + DIFF_CN[state.diff]);
+  L.push('结果：' + (state.winner ? COL[state.winner].name + '获胜' : '对局进行中') + '　共 ' + state.moveCount + ' 手');
+  L.push('────────────────');
+  for (const h of history){
+    L.push(h.n + '. ' + COL[h.owner].short + ' (' + h.land.x + ',' + h.land.y + ')');
+  }
+  if (state.winCells && state.winCells.length){
+    L.push('────────────────');
+    L.push('连线：' + state.winCells.map(c=> '(' + c[0] + ',' + c[1] + ')').join(' → '));
+  }
+  return L.join('\n');
+}
+let copyTimer = null;
+function copyRecord(btn){
+  const target = btn || bnCopy;
+  const text = buildRecord();
+  const restore = target === bnCopy ? '复制比赛记录' : '复制记录';
+  const done = ok=>{
+    target.textContent = ok ? '已复制 ✓' : '复制失败';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(()=>{ target.textContent = restore; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>done(true), ()=>done(legacyCopy(text)));
+  } else done(legacyCopy(text));
+}
+function legacyCopy(text){
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch(e){ return false; }
+}
+bnCopy.addEventListener('click', ()=> copyRecord(bnCopy));
+document.getElementById('btnCopyRec').addEventListener('click', e=> copyRecord(e.target));
+
+/* ==========================================================================
+   残局导入：粘贴「复制记录」文本 → 重建棋盘 → 可在当前单机模式继续
+   ========================================================================== */
+const loadEl = document.getElementById('load');
+const loadText = document.getElementById('loadText');
+function parseRecord(text){
+  const moves = []; let winner = 0;
+  for (const raw of String(text).split(/\r?\n/)){
+    const line = raw.trim();
+    if (!line) continue;
+    let m = line.match(/^结果\s*[:：]\s*(红方|蓝方)获胜/);
+    if (m){ winner = m[1] === '红方' ? P1 : P2; continue; }
+    m = line.match(/^(\d+)\s*[.、]\s*(红|蓝)\s*[（(]\s*(-?\d+)\s*,\s*(-?\d+)\s*[)）]/);
+    if (m) moves.push({ owner: m[2] === '红' ? P1 : P2, x: +m[3], y: +m[4] });
+  }
+  return { moves, winner };
+}
+function loadFromText(){
+  const { moves, winner } = parseRecord(loadText.value);
+  if (!moves.length){ toast('未能识别有效手数，请粘贴「复制记录」的文本'); return; }
+  const occ2 = new Map(); occ2.set(K(0, 0), BLOCK);
+  moveNo = new Map(); history = [];
+  for (const mv of moves){
+    const k = K(mv.x, mv.y);
+    if (occ2.has(k)){
+      toast('第 ' + (history.length + 1) + ' 手 (' + mv.x + ',' + mv.y + ') 与已有棋子重叠，请检查记录');
+      return;
+    }
+    occ2.set(k, mv.owner);
+    history.push({ n: history.length + 1, owner: mv.owner, drop:{x:mv.x,y:mv.y}, land:{x:mv.x,y:mv.y} });
+    moveNo.set(k, history.length);
+  }
+  occ = occ2;
+  state.moveCount = history.length;
+  state.opener = history[0] ? history[0].owner : P1;
+  state.lastMove = history.length ? { x:history[history.length-1].land.x, y:history[history.length-1].land.y } : null;
+  state.winner = 0; state.winCells = null;
+  moving = null; banner.classList.remove('show');
+  computeDanger();
+  if (winner){
+    state.phase = 'over'; state.winner = winner;
+    showBanner(winner); updateUI();
+  } else {
+    state.phase = 'idle';
+    state.turn = history.length ? (history[history.length-1].owner === P1 ? P2 : P1) : P1;
+    updateUI();
+    maybeAI();                       // 轮到 AI 时自动续走（hm/mh/mm）
+  }
+  loadEl.classList.add('hidden');
+  if (winner) toast('已导入残局 · ' + COL[winner].name + '获胜（可悔棋复盘）');
+  else toast('已导入 ' + state.moveCount + ' 手残局 · 轮到' + (state.turn === P1 ? '红方' : '蓝方'));
+}
+document.getElementById('btnLoad').addEventListener('click', ()=>{
+  if (state.mode === 'net'){ toast('联机对局需双方一致，请在单机模式导入'); return; }
+  loadText.value = '';
+  loadEl.classList.remove('hidden');
+  try { loadText.focus(); } catch(e){}
+});
+document.getElementById('loadDo').addEventListener('click', loadFromText);
+document.getElementById('loadClose').addEventListener('click', ()=> loadEl.classList.add('hidden'));
+loadEl.addEventListener('click', e=>{ if (e.target === loadEl) loadEl.classList.add('hidden'); });
+
+mmSpeed.addEventListener('input', ()=>{
+  state.mmDelay = Math.round(60 + (100 - mmSpeed.value)/100 * 1140);
+});
+[optPredict, optFollow, optCoord, optNumber, optDanger].forEach(el=> el.addEventListener('change', ()=>{
+  if (el === optPredict){ predictKey = ''; predictCell = null; }
+  if (el === optNumber) showNumber = optNumber.checked;
+  if (el === optDanger){ showDanger = optDanger.checked; computeDanger(); }
+}));
+
+function showBanner(o){
+  document.getElementById('bnDot').style.background = COL[o].base;
+  document.getElementById('bnText').textContent = COL[o].name + '获胜！（' + state.moveCount + ' 手）';
+  bnCopy.textContent = '复制比赛记录';
+  banner.classList.add('show');
+}
+
+/* ==========================================================================
+   局域网联机
+   协议（与 四子棋服务器.js 配套，双方各自本地做确定性物理演算，网络上
+   只同步投点与落定结果）：
+     sys{event:'start'}          双方到齐
+     move{n, drop, land}         一手落定（n=手数序号）
+     correction{n, land}         落点校正（极端情况，以先落子方为准）
+     restart                     重新开局
+     resync / sync{history}      序号对不上时全量补齐
+     bye                         离开
+   ========================================================================== */
+const netHostBtn  = document.getElementById('netHost');
+const netJoinBtn  = document.getElementById('netJoin');
+const netLeaveBtn = document.getElementById('netLeave');
+const netCodeInp  = document.getElementById('netCode');
+const netHint     = document.getElementById('netHint');
+const netLobbyEl  = document.getElementById('netLobby');
+const netRoomEl   = document.getElementById('netRoom');
+const netInfoEl   = document.getElementById('netInfo');
+const netBoxEl    = document.getElementById('netBox');
+const netPrepEl   = document.getElementById('netPrep');
+const netPrepState= document.getElementById('netPrepState');
+const netReadyBtn = document.getElementById('netReady');
+const optAllowUndo= document.getElementById('optAllowUndo');
+const firstSegEl  = document.getElementById('firstSeg');
+
+const net = {
+  available:false,                 // 页面是否通过联机服务器打开（探测 /api/ping）
+  room:'', token:'', side:'',      // side: 'host' | 'guest'
+  myColor:0, oppColor:0,
+  connected:false, active:false, waiting:false, busy:false, looping:false,
+  lastId:0, fail:0, oppState:'none',   // 对手在线状态: online | offline | none
+  lobby:true,                    // 准备大厅（双方 ready 后才开局）
+  ready:false, peerReady:false,  // 我方/对方是否已点准备
+  rules:{ allowUndo:true, firstRule:'random' },   // 房规（消息广播同步）
+  startSeq:0
+};
+let netPending = null;             // 远端 move 报告的落点，待本地落定后校验
+
+/* 断线重连存档（localStorage 不可用时静默降级，如 file:// 隐私模式） */
+const netStore = {
+  get(){ try { return JSON.parse(localStorage.getItem('g4net') || 'null'); } catch(e){ return null; } },
+  set(v){ try { v ? localStorage.setItem('g4net', JSON.stringify(v)) : localStorage.removeItem('g4net'); } catch(e){} }
+};
+
+const netSleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function netSend(msg){
+  if (!net.connected) return;
+  try{
+    await fetch('/api/send', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ room:net.room, token:net.token, msg })
+    });
+  } catch(e){ /* 断线由 pollLoop 统一发现 */ }
+}
+
+async function netPing(){
+  try { const r = await fetch('/api/ping'); net.available = r.ok; }
+  catch(e){ net.available = false; }
+  document.getElementById('modeNet').disabled = !net.available;
+}
+
+function refreshNetUI(){
+  const inNet = state.mode === 'net';
+  netLobbyEl.style.display = (inNet && !net.connected) ? '' : 'none';
+  netRoomEl.style.display  = (inNet &&  net.connected) ? '' : 'none';
+  if (!inNet || net.connected) return;
+  if (net.waiting) netHint.textContent = '房间码 ' + net.room + ' · 等待对手加入…';
+}
+
+/* 准备大厅 / 对局中的连接面板内容 */
+function refreshPrep(){
+  if (!net.connected || state.mode !== 'net') return;
+  netInfoEl.textContent = '房间 ' + net.room + ' · 你执' + (net.myColor === P1 ? '红' : '蓝');
+  netPrepEl.style.display = net.lobby ? 'flex' : 'none';
+  if (!net.lobby){
+    netInfoEl.textContent += ' · 对局中';
+    return;
+  }
+  netInfoEl.textContent += (net.oppState === 'offline' ? ' · 对方已断线' : '');
+  let t;
+  if (net.ready)      t = net.peerReady ? '双方已准备…' : '已准备 · 等待对方…';
+  else if (net.peerReady) t = '对方已准备 · 请点「准备」开始';
+  else                t = '请双方点击「准备」后开始';
+  netPrepState.textContent = t;
+  netReadyBtn.classList.toggle('on', net.ready);
+  netReadyBtn.textContent = net.ready ? '已准备（点击取消）' : '准备';
+  /* 房规控件回显（避免重复发送） */
+  syncRuleUI();
+}
+
+function setNetBusy(busy, txt){
+  netHostBtn.disabled = busy || net.waiting;
+  netJoinBtn.disabled = busy || net.waiting;
+  if (busy && txt) netHint.textContent = txt;
+}
+
+async function netCreate(){
+  if (net.busy || net.waiting) return;
+  net.busy = true; setNetBusy(true, '创建中…');
+  try{
+    const d = await (await fetch('/api/create')).json();
+    if (d.err){ netHint.textContent = d.err; return; }
+    net.room = d.room; net.token = d.token; net.side = 'host'; net.waiting = true;
+    net.active = true;                              // 创建后即开始轮询，等待 sys/start
+    netStore.set({ room:net.room, token:net.token, side:'host' });
+    ensurePollLoop();
+    setNetBusy(false); refreshNetUI();
+  } catch(e){ netHint.textContent = '无法连接服务器'; }
+  finally{ net.busy = false; }
+}
+
+async function netJoin(){
+  if (net.busy || net.waiting) return;
+  const code = netCodeInp.value.trim().toUpperCase();
+  if (code.length !== 4){ netHint.textContent = '请输入 4 位房间码'; return; }
+  const saved = netStore.get();
+  const reTok = (saved && saved.side === 'guest' && saved.room === code) ? saved.token : '';
+  net.busy = true; setNetBusy(true, '加入中…');
+  try{
+    const d = await (await fetch('/api/join?room=' + encodeURIComponent(code) +
+                                (reTok ? '&token=' + encodeURIComponent(reTok) : ''))).json();
+    if (d.err){ netHint.textContent = d.err; netStore.set(null); return; }
+    net.room = code; net.token = d.token; net.side = 'guest'; net.waiting = false;
+    net.startSeq = d.seq || 0;                      // 从当下开始拉取，历史靠 resync 恢复
+    netStart();
+  } catch(e){ netHint.textContent = '无法连接服务器'; }
+  finally{ net.busy = false; }
+}
+
+function netStart(){
+  if (net.connected) return;                       // 防重复
+  net.myColor  = net.side === 'host' ? P1 : P2;
+  net.oppColor = net.myColor === P1 ? P2 : P1;
+  net.connected = true; net.active = true; net.waiting = false;
+  net.fail = 0; netPending = null; net.oppState = 'online';
+  net.lobby = true; net.ready = false; net.peerReady = false;
+  net.lastId = net.startSeq || 0;                  // 不回放历史消息（历史状态由 resync 全量恢复）
+  /* 存档匹配 → 断线重连：拉取全量棋局继续 */
+  const saved = netStore.get();
+  const reconnect = !!(saved && saved.room === net.room && saved.token === net.token && saved.side === net.side);
+  netStore.set({ room:net.room, token:net.token, side:net.side });
+  resetGame(); refreshNetUI(); refreshPrep(); updateUI();
+  if (reconnect){
+    toast('已重新连接 · 请重新准备');
+    netSend({ type:'resync' });
+  } else {
+    toast('已进入房间 · 请调整房规并点「准备」');
+  }
+  ensurePollLoop();
+}
+
+async function pollLoop(){
+  while (net.active){
+    try{
+      const r = await fetch('/api/poll?room=' + net.room + '&token=' + net.token + '&since=' + net.lastId);
+      if (!r.ok) throw new Error('http ' + r.status);
+      const d = await r.json();
+      if (d.dead){ netDropped('房间已关闭'); return; }
+      if (d.opp){ net.oppState = d.opp; refreshPrep(); }   // 对手在线状态
+      if (d.msgs && d.msgs.length){
+        for (const m of d.msgs) netHandle(m);
+        net.lastId = d.msgs[d.msgs.length - 1].id;
+        net.fail = 0;
+        continue;                                    // 可能还有后续消息，立刻再拉
+      }
+      await netSleep(350);
+    } catch(e){
+      if (++net.fail >= 3){ netDropped('连接断开'); return; }
+      await netSleep(600);
+    }
+  }
+}
+function ensurePollLoop(){
+  if (net.looping) return;
+  net.looping = true;
+  pollLoop().finally(()=>{ net.looping = false; });
+}
+
+/* 开始对局（服务器双 ready 仲裁后推 sys/start，firstOwner 由 host 随准备消息提供） */
+function beginNetGame(firstOwner){
+  if (!net.connected) return;
+  net.lobby = false; net.ready = false; net.peerReady = false;
+  newGame(firstOwner || (net.side === 'host' ? P1 : P2));
+  refreshPrep(); updateUI();
+  toast((net.myColor === P1 ? '红' : '蓝') + '先手 · 开始');
+}
+
+/* 房规中的「下轮先手」：由重启请求方一次算出，随 restart 广播，保证双方一致 */
+function calcFirstByRule(bySide, winner){
+  const r = net.rules.firstRule;
+  const my = bySide === 'host' ? P1 : P2;
+  if (r === 'resigner') return my === P1 ? P2 : P1;   // 重开方后手 → 对方先
+  if (r === 'winner')   return winner || P1;
+  if (r === 'loser')    return winner ? (winner === P1 ? P2 : P1) : P1;
+  return Math.random() < 0.5 ? P1 : P2;               // 随机
+}
+/* 首局先手：host 随「准备」提供（random 现场决定；其余规则无历史 → 红先） */
+function calcFirstForFirstGame(){
+  return net.rules.firstRule === 'random' ? (Math.random() < 0.5 ? P1 : P2) : P1;
+}
+
+function netHandle(m){
+  switch (m.type){
+    case 'sys':
+      if (m.event === 'lobby' && net.side === 'host'){
+        if (!net.connected) netStart();
+        else if (net.connected && !net.lobby){
+          // 对局中对方掉线被顶替 → 回大厅重新准备
+          net.lobby = true; net.ready = false; net.peerReady = false;
+          resetGame(); refreshPrep(); updateUI();
+          toast('新对手已加入 · 请重新准备');
+        } else { net.peerReady = false; refreshPrep(); }
+      } else if (m.event === 'start'){
+        beginNetGame(m.firstOwner);
+      }
+      break;
+    case 'ready':
+      net.peerReady = !!m.on;
+      refreshPrep(); updateUI();
+      break;
+    case 'rules':
+      net.rules = Object.assign({ allowUndo:true, firstRule:'random' }, m.rules || {});
+      refreshPrep(); updateUI();
+      break;
+    case 'undo':
+      if (net.rules.allowUndo){
+        if (undoMoves(m.count)) toast('对方悔棋 ' + m.count + ' 手');
+      }
+      break;
+    case 'move': {
+      if (m.n !== state.moveCount + 1){ netSend({ type:'resync' }); break; }
+      netPending = m.land;
+      if (!placePiece({ x:m.drop.x, y:m.drop.y }, net.oppColor, true)) netSend({ type:'resync' });
+      break;
+    }
+    case 'correction':
+      applyCorrection(m.n, m.land);
+      toast('落点已按对方数据校正');
+      break;
+    case 'restart':
+      newGame(m.firstOwner || P1);          // 先手由重启请求方按房规算好并广播
+      refreshPrep(); updateUI();
+      toast('对方重新开局' + (m.firstOwner ? ' · ' + COL[m.firstOwner].short + '先手' : ''));
+      break;
+    case 'resync':
+      netSend({ type:'sync', history, opener:state.opener });
+      break;
+    case 'sync':
+      applySync(m.history, m.opener);
+      break;
+    case 'bye':
+      if (net.side === 'host'){
+        // 对方离开：房主回大厅等新对手（对局中断）
+        net.lobby = true; net.ready = false; net.peerReady = false;
+        netStore.set({ room:net.room, token:net.token, side:net.side });
+        resetGame(); refreshPrep(); updateUI();
+        toast('对方已离开 · 等待新对手');
+      } else {
+        netDropped('对方已离开');
+      }
+      break;
+  }
+}
+
+/* 落点校正：替换第 n 手的最终落点，并重判胜负 */
+function applyCorrection(n, land){
+  const h = history[n - 1];
+  if (!h) return;
+  if (h.land.x === land.x && h.land.y === land.y) return;
+  const oldKey = K(h.land.x, h.land.y);
+  removeP(h.land.x, h.land.y);
+  addP(land.x, land.y, h.owner);
+  h.land = { x:land.x, y:land.y };
+  moveNo.delete(oldKey);
+  moveNo.set(K(land.x, land.y), n);
+  state.lastMove = { x:land.x, y:land.y };
+  const line = checkWin(land.x, land.y, h.owner);
+  if (line){
+    state.phase = 'over'; state.winner = h.owner; state.winCells = line;
+    showBanner(h.owner);
+  } else {
+    state.phase = 'idle'; state.winner = 0; state.winCells = null;
+    state.turn = h.owner === P1 ? P2 : P1;
+    banner.classList.remove('show');
+  }
+  computeDanger(); updateUI();
+}
+
+/* 全量对局重建（resync 应答）：收到非空棋局说明对方在对局中，自动退出准备大厅 */
+function applySync(h, opener){
+  if (!Array.isArray(h)) return;
+  occ = new Map(); occ.set(K(0, 0), BLOCK);
+  moveNo = new Map(); history = [];
+  for (const it of h){
+    addP(it.land.x, it.land.y, it.owner);
+    moveNo.set(K(it.land.x, it.land.y), it.n);
+    history.push(it);
+  }
+  state.opener = opener || (h.length ? h[0].owner : P1);
+  state.moveCount = h.length;
+  state.lastMove = h.length ? { x:h[h.length - 1].land.x, y:h[h.length - 1].land.y } : null;
+  state.phase = 'idle'; state.winner = 0; state.winCells = null;
+  state.turn = h.length ? (h[h.length - 1].owner === P1 ? P2 : P1) : state.opener;
+  if (h.length > 0 && net.connected) net.lobby = false;   // 恢复进行中的棋局
+  moving = null; banner.classList.remove('show');
+  computeDanger(); refreshPrep(); updateUI();
+}
+
+function netDropped(reason){
+  const was = net.connected;
+  net.connected = false; net.active = false; net.waiting = false; net.looping = false;
+  net.oppState = 'none';
+  net.lobby = true; net.ready = false; net.peerReady = false;
+  net.room = ''; net.token = ''; net.side = '';
+  /* 保留存档：意外断线后刷新页面可凭 token 重连 */
+  netCodeInp.value = ''; netHint.textContent = '';
+  setNetBusy(false);
+  refreshNetUI(); updateUI();
+  if (was && reason) toast(reason + '，联机已断开');
+}
+
+async function netLeave(silent){
+  if (net.connected && !silent) netSend({ type:'bye' });
+  netStore.set(null);                              // 主动断开：清除重连存档
+  netDropped('');
+}
+
+netHostBtn.addEventListener('click', netCreate);
+netJoinBtn.addEventListener('click', netJoin);
+netLeaveBtn.addEventListener('click', ()=> netLeave(false));
+netCodeInp.addEventListener('keydown', e=>{ if (e.key === 'Enter') netJoin(); });
+
+/* --- 房规 / 准备 --- */
+function syncRuleUI(){
+  if (!optAllowUndo || !firstSegEl) return;
+  optAllowUndo.checked = net.rules.allowUndo;
+  firstSegEl.querySelectorAll('button').forEach(b =>
+    b.classList.toggle('on', b.dataset.f === net.rules.firstRule));
+}
+function broadcastRules(){
+  netSend({ type:'rules', rules: net.rules });
+  refreshPrep();
+}
+optAllowUndo.addEventListener('change', ()=>{
+  net.rules.allowUndo = optAllowUndo.checked;
+  broadcastRules(); updateUI();
+});
+firstSegEl.addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  net.rules.firstRule = b.dataset.f;
+  broadcastRules();
+});
+netReadyBtn.addEventListener('click', ()=>{
+  if (!net.connected || !net.lobby) return;
+  if (!net.ready){
+    net.ready = true;
+    netSend({ type:'ready', on:true,
+              firstOwner: net.side === 'host' ? calcFirstForFirstGame() : undefined });
+  } else {
+    net.ready = false;
+    netSend({ type:'ready', on:false });
+  }
+  refreshPrep(); updateUI();
+});
+
+/* --- URL 参数自动进场（配合 start-online.js 一键开房）---
+   ?room=码&key=令牌 → 房主直通：直接进入等待对手状态
+   ?room=码          → 对方打开：自动填码并加入
+   无参数            → 若有上局存档（localStorage）则自动重连 */
+function netEnterMode(){
+  state.mode = 'net';
+  document.querySelectorAll('#modeSeg button').forEach(x=> x.classList.toggle('on', x.dataset.mode === 'net'));
+  resetGame(); updateUI();
+}
+function netRestore(){
+  const s = netStore.get();
+  if (!s || !s.room || s.room.length !== 4) return;
+  if (s.side === 'host'){
+    net.room = s.room; net.token = s.token; net.side = 'host';
+    net.active = true;
+    netEnterMode();
+    netStart();                        // 直接连入：对局中则 resync 恢复
+    netSend({ type:'resync' });
+  } else {
+    netEnterMode();
+    netCodeInp.value = s.room;
+    netJoin();                                      // 带 token → 服务器识别为重连
+  }
+}
+function applyUrlRoom(){
+  let room = '', key = '';
+  try{
+    /* 手写解析，不依赖 URL API（file:// 与非标准环境同样可用） */
+    const q = String(location.href).split('?')[1] || '';
+    const get = k => { const m = q.match(new RegExp('(?:^|&)' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
+    room = get('room').trim().toUpperCase();
+    key  = get('key');
+  } catch(e){ return; }
+  if (room && room.length === 4){
+    if (key){
+      net.room = room; net.token = key; net.side = 'host';
+      net.active = true;
+      netEnterMode();
+      netStart();                      // 直通进入准备大厅（对局中则 resync 恢复）
+      netSend({ type:'resync' });
+    } else {
+      netEnterMode();
+      netCodeInp.value = room;
+      netJoin();
+    }
+    return;
+  }
+  netRestore();
+}
+
+/* ==========================================================================
+   启动
+   ========================================================================== */
+resize();
+state.mmDelay = Math.round(60 + (100 - mmSpeed.value)/100 * 1140);
+resetGame();
+homeView();
+netPing();
+applyUrlRoom();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

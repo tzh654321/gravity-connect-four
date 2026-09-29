@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{ --bg:#0f1419; --card:#1a212b; --card2:#222b38; --bd:#2c3744; --fg:#e6edf3; --mut:#8a97a6; --acc:#58a6ff; --warn:#f0883e; --good:#3fb950; --bad:#f85149; }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.6;padding:32px 18px}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:.5px}
+.sub{color:var(--mut);font-size:13px;margin-bottom:24px}
+h2{font-size:18px;margin:34px 0 12px;padding-left:10px;border-left:3px solid var(--acc)}
+h3{font-size:15px;margin:20px 0 8px;color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;margin:14px 0}
+.kv{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.stat{flex:1;min-width:150px;background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.stat .n{font-size:22px;font-weight:700}
+.stat .l{color:var(--mut);font-size:12px;margin-top:2px}
+.note{background:#1d2430;border-left:3px solid var(--warn);padding:10px 14px;border-radius:0 8px 8px 0;color:#d7c3a8;font-size:13px;margin:12px 0}
+.ok{border-left-color:var(--good);color:#bfe6c6}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--card2);color:var(--acc);font-weight:600}
+td code,code{background:#0c1117;padding:1px 6px;border-radius:4px;font-size:12px;color:#9ad}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;margin-right:4px}
+.t0{background:#143d2e;color:#7ee2a8} .t1{background:#3a2d12;color:#f0b454} .t2{background:#2a3550;color:#8fb6ff} .t3{background:#3a1f2b;color:#f08aa0}
+.path{color:var(--mut);font-size:12px}
+.bar{height:8px;background:#0c1117;border-radius:5px;overflow:hidden;margin-top:5px}
+.bar>i{display:block;height:100%}
+.pill{font-size:12px;padding:2px 9px;border-radius:20px;font-weight:600}
+.pill.p{background:#143d2e;color:#7ee2a8} .pill.l{background:#2a3550;color:#8fb6ff} .pill.w{background:#3a1f2b;color:#f08aa0}
+</style></head><body><div class="wrap">
+<h1>重力四子棋 · AI 优化现状与路线分析</h1>
+<div class="sub">项目：D:\Download\棋\重力四子棋-html ｜ 数据基准：tools/neural/eval_result.json（2026-09-06，120 局 + 探索矩阵）</div>
+
+<div class="card">
+<div class="kv">
+  <div class="stat"><div class="n">54.2%</div><div class="l">NN Leader 对内置 hard 折算胜率（120 局，交替先手）</div></div>
+  <div class="stat"><div class="n">63% / 45%</div><div class="l">执红先手 / 执蓝后手 分部胜率</div></div>
+  <div class="stat"><div class="n">±4.5%</div><div class="l">标准误（所有搜索参数同处一个平台）</div></div>
+  <div class="stat"><div class="n">0</div><div class="l">超出噪声的稳定增益（qN/branch/depth/叶子族/richMix 全测）</div></div>
+</div>
+<div class="note ok">核心结论（来自 eval_result.json 注记）：<b>"胜负主要由本游戏先手优势（red≈55–63%）决定；对 hard 的‘取胜率’天花板即先手方占比，继续调参与扩网已无实质回报。"</b> —— NN 引擎已与内置 hard <b>完全对等</b>，平台的"高度"是先手优势而非 AI 强度。</div>
+</div>
+
+<h2>一、现状快照：引擎已经相当成熟</h2>
+<div class="card">
+<h3>① 主引擎 重力四子棋.html（启发式 + 战术搜索）</h3>
+<table>
+<tr><th>模块</th><th>作用</th><th>位置</th></tr>
+<tr><td><code>scoreOption</code></td><td>静态评估：立即连四(myG/opG)、双威胁(forks)、doom 一票否决</td><td>L697</td></tr>
+<tr><td><code>oppBestReply</code></td><td>第二层：识别对手应答后的"自身进攻收益"（防过度保守）</td><td>L739</td></tr>
+<tr><td><code>lookaheadThreat</code></td><td>多层威胁前瞻：2 步内必败链(level2)否决 / 被逼唯一应手(level1)减分</td><td>L773</td></tr>
+<tr><td><code>threatNega</code></td><td>强制威胁链 negamax：只沿战术点深展，深度可达 7、节点上限 12000</td><td>L843</td></tr>
+<tr><td><code>quietNega</code> / <code>quietSearchValue</code></td><td>安静局面迭代深搜（2~6 层，节点预算封顶），叶子可用 NN</td><td>L1051 / L1116</td></tr>
+<tr><td><code>diversifyPick</code></td><td>近优带加权随机，避免机机对局千篇一律（实测曾 96% 同构）</td><td>L682</td></tr>
+</table>
+<p class="path">强度分档：easy / normal / hard，差异在候选宽度(K)、前瞻深度、是否启用 fsn 链。</p>
+</div>
+
+<div class="card">
+<h3>② tools/neural/ — 已是完整的 AlphaZero 风格管线</h3>
+<table>
+<tr><th>环节</th><th>文件</th><th>说明</th></tr>
+<tr><td>网络</td><td><code>mlp.js</code></td><td>纯 JS 稠密 MLP + Adam，权重可 JSON 注入 HTML</td></tr>
+<tr><td>特征</td><td><code>features.js</code>(16维) <code>features2.js</code>(18维)</td><td>窗口计数 + 子数/中心度 + 连四肢点 + 奇偶</td></tr>
+<tr><td>数据采集</td><td><code>collect.js</code></td><td>自博弈录制 (局面, 终局结果) —— <span class="pill w">关键瓶颈见下</span></td></tr>
+<tr><td>蒸馏</td><td><code>distill.js</code></td><td>从教师（启发式）蒸馏标签</td></tr>
+<tr><td>训练</td><td><code>train.js</code></td><td>监督回归 (特征 → t=±1)，90/10 切分</td></tr>
+<tr><td>智能体</td><td><code>agents-builtin/nn/leader/html</code></td><td>4 套实现可互相对战</td></tr>
+<tr><td>竞技场</td><td><code>arena.js</code> <code>eval.js</code></td><td>NN vs 内置 hard，交替先手评测</td></tr>
+<tr><td>部署</td><td><code>inject.js</code></td><td>权重注入 → 独立可运行 <code>重力四子棋-nn.html</code></td></tr>
+</table>
+<p class="path">实验产物已不少：model_leaf / model_dist*、eval_*、data_*.jsonl（MB 级）、trans/ 转置表雏形。</p>
+</div>
+
+<h2>二、为什么"再调参 / 扩网"没用：三大天花板</h2>
+
+<div class="card">
+<span class="tag t3">天花板 A</span><b>评测基准是"自己打自己"——循环基准</b>
+<p>被测的 <code>html-leader</code> = <code>aiChooseMove</code> + <code>quietNega</code> 迭代深搜 + 16 维 MLP 叶子；对手 <code>内置 hard</code> = <code>aiChooseMove</code> + 启发式叶子。二者<b>同一套搜索骨架，只差叶子</b>。所以它们天然对等。而 <code>eval.js</code> 只测"对 hard 胜率"，于是所有变体都绕 54% 打转——这不是"强度都够好"，是<b>基准无法区分强弱</b>。</p>
+<p><b>证据：</b>eval_result 探索矩阵中 blue_q16、branch8、blueDeeper、red_idA 等 11 组全落在 27.5%~65% 且无一组稳定超噪声；final_p1.json（html agent, d4 b6）40 局 25胜15负 ≈ 54.2%。</p>
+</div>
+
+<div class="card">
+<span class="tag t1">天花板 B</span><b>数据是"教师锁定"的——网络永远追不上老师</b>
+<p><code>collect.js</code> 用<b>内置 hard 自对弈</b>产局，<code>train.js</code> 用终局 ±1 作标签。由于 hard 与 NN 处于同一平台，标签和训练分布都被 hard 封顶：<b>NN 只是在模仿 hard，不可能超越 hard</b>。这正是反弹棋 NN 失败（弱教师锁死 + 镜像对称）的同一类根因。</p>
+<p><b>证据：</b>collect.js L14-46 数据采集来源 = <code>builtinAgent(diff)</code>；train.js L6 标签即 <code>t:-1|0|1</code> 单局二元。</p>
+</div>
+
+<div class="card">
+<span class="tag t2">天花板 C</span><b>安静局面搜索太浅 + 特征缺乏不变性</b>
+<table>
+<tr><th>维度</th><th>现状</th><th>上限</th></tr>
+<tr><td>强制搜索</td><td><code>threatNega</code> 深度 7、节点封顶 12000，仅沿战术点</td><td>安静局命中即停（return 0）</td></tr>
+<tr><td>安静搜索</td><td><code>quietNega</code>/leader 深度 4、分支 6~8、节点 10 万</td><td>安静局仅 ~4 层，长线规划弱</td></tr>
+<tr><td>特征</td><td>16 维窗口计数 + 子数/中心度 + 奇偶</td><td>无旋转/镜像不变性、无机动性、无"对手潜伏线"</td></tr>
+<tr><td>标签</td><td>单局二元 ±1</td><td>方差大，需 TD(λ)/自博弈自举</td></tr>
+<tr><td>策略头</td><td>无，仅价值叶 + 固定启发式排序</td><td>无法做 MCTS 式选择/剪枝</td></tr>
+</table>
+<p class="path">注：trans/ trans_idA/ trans_idB/ 目录说明已有人开始做转置表雏形，但 HTML 主搜索尚未接入。</p>
+</div>
+
+<h2>三、优化路线图（按杠杆/成本排序）</h2>
+
+<div class="card">
+<h3>P0 · 先修"尺子"（成本最低、杠杆最高）</h3>
+<table>
+<tr><th>动作</th><th>做法</th><th>解决</th></tr>
+<tr><td>建 Elo 天梯</td><td>把 内置hard / 当前NN / 候选 都注册为玩家，跑固定交叉对局算 Elo±CI</td><td>天花板 A：让"真变强"显形为 Elo 上升而非 54% 噪声</td></tr>
+<tr><td>弱对手池</td><td>增加 内置normal/easy 作固定陪练，"胜率"不再被先手平局封顶</td><td>天花板 A：强度可独立于先后手度量</td></tr>
+<tr><td>测批确定性</td><td>排名阶段关掉 <code>diversifyPick</code> 随机/加 bootstrap CI</td><td>小增益不再被噪声淹没</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>P1 · 打破教师锁：自博弈 RL / MCTS（真正的跃升）</h3>
+<table>
+<tr><th>动作</th><th>做法</th><th>预期</th></tr>
+<tr><td>自博弈数据</td><td>让 NN 自己打自己（或 NN vs NN + 偶发 hard），以终局标自身数据再训练，迭代</td><td>脱离 hard 天花板（AlphaGo/Zero 路径）</td></tr>
+<tr><td>上 MCTS</td><td>NN 同时做 策略+价值 头，每手 200~2000 次模拟；比定深 alpha-beta+价值网 通常更强</td><td>同等 1.2s/手 预算下有效搜索更深</td></tr>
+<tr><td>TD(λ) 目标</td><td>用自举价值替代单局二元标签，降方差</td><td>训练更稳、泛化更好</td></tr>
+</table>
+<div class="note">这是反弹棋分析后给过的同一结论：<b>函数逼近器 + 搜索 + 自博弈</b> 才是上限形态。当前项目设施（MLP、自博弈、注入）已齐，缺的是"数据来自自身而非固定教师"。</div>
+</div>
+
+<div class="card">
+<h3>P2 · 强化价值网输入（便宜，与 P1 复利）</h3>
+<table>
+<tr><th>改进</th><th>说明</th></tr>
+<tr><td>对称增广</td><td>训练时 8 向变换增广，使网学会旋转/镜像不变性（直接修复反弹棋 NN 的镜像失效）</td></tr>
+<tr><td>特征扩维</td><td>加 距中心直方图、机动性(可达落点数)、对手潜伏线计数、>my3 的形状直方图；16 维过压缩</td></tr>
+<tr><td>策略头</td><td>预测每步优劣，供 MCTS 选择 + 剪枝</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>P3 · 搜索效率（抬高单位时间可达的上限）</h3>
+<table>
+<tr><th>改进</th><th>说明</th></tr>
+<tr><td>转置表</td><td>把 trans/ 雏形接进 <code>threatNega</code>/<code>quietNega</code>，复用强制线子树</td></tr>
+<tr><td>迭代加深 + 渴望窗口 + killer 着</td><td>现有 ID 框架上补，减少无效展开</td></tr>
+<tr><td>若走 MCTS</td><td>策略头剪枝即"更深的有效搜索"，1.2s 预算内收益最大</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>P4 · 游戏层杠杆（可选，针对 55–63% 先手墙）</h3>
+<p>当前"胜率天花板"部分是<b>游戏本身的先手优势</b>，不是 AI 弱。连珠/六子棋类标准做法——<b>交换规则（swap：后手可交换先后手）</b>——能中和先手偏置，让"强度"独立于颜色可度量；届时真正更强的 AI 即便在 swap 下也能压制。属房规层面改动，可单独评估。</p>
+</div>
+
+<h2>四、不要再做的（纯浪费）</h2>
+<div class="card">
+<ul style="margin:6px 0">
+<li><b>继续调启发式权重</b>（<code>tune-weights.js</code>）—— 工具 README 已明说"默认权重已是局部较优点，纯调数字收益有限"。</li>
+<li><b>继续网格搜 leader 搜索参数</b>（qN/branch/depth/叶子族/richMix）—— eval_result 探索矩阵证明全部同平台、无稳定增益。</li>
+<li><b>只扩 MLP 而不改数据与特征</b>—— 在教师锁 + 浅特征下，加大网络只是更贵地拟合同一平台。</li>
+</ul>
+</div>
+
+<h2>五、一句话总结</h2>
+<div class="note ok" style="font-size:14px">引擎早已"够强到与自身对等"，但被<b>循环基准 + 教师锁 + 浅搜索</b>三道天花板压在同一个先手平台上。下一步的杠杆不是"再调"，而是 <b>P0 换把尺子（Elo 天梯）→ P1 用自博弈/MCTS 让网络脱离固定教师自举</b>；特征增广与转置表是便宜的复利项。把这两步做出来，AI 才有机会真正超越当前 54% 的"平局线"。</div>
+
+<p class="path" style="text-align:center;margin-top:28px">证据文件：tools/neural/eval_result.json · final_p1.json · collect.js · train.js · agents-leader.js · 重力四子棋.html L697/L739/L773/L843/L1051</p>
+</div></body></html>

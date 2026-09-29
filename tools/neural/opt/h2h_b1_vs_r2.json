@@ -1,0 +1,15 @@
+{
+  "a": "tools/neural/opt/model_b1.json",
+  "b": "tools/neural/opt/model_pv_r2.json",
+  "games": 150,
+  "sims": 100,
+  "win": 72,
+  "loss": 78,
+  "draw": 0,
+  "scoreRate": 0.48,
+  "ci95": [
+    0.4015497821637989,
+    0.5594490634020298
+  ],
+  "verdict": "不显著（置信区间跨过 50%）⚠️"
+}

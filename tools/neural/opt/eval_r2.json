@@ -1,0 +1,47 @@
+{
+  "newElo": 1460,
+  "perOpp": [
+    {
+      "key": "easy",
+      "anchor": 700,
+      "win": 24,
+      "loss": 0,
+      "draw": 0,
+      "scoreRate": "1.000"
+    },
+    {
+      "key": "normal",
+      "anchor": 1000,
+      "win": 16,
+      "loss": 8,
+      "draw": 0,
+      "scoreRate": "0.667"
+    },
+    {
+      "key": "hard",
+      "anchor": 1400,
+      "win": 18,
+      "loss": 6,
+      "draw": 0,
+      "scoreRate": "0.750"
+    },
+    {
+      "key": "old_mcts",
+      "anchor": 1400,
+      "win": 12,
+      "loss": 12,
+      "draw": 0,
+      "scoreRate": "0.500"
+    },
+    {
+      "key": "old_nn",
+      "anchor": 1400,
+      "win": 22,
+      "loss": 2,
+      "draw": 0,
+      "scoreRate": "0.917"
+    }
+  ],
+  "gamesPerOpp": 24,
+  "sims": 100
+}

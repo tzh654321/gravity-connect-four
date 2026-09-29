@@ -1,0 +1,44 @@
+name: Deploy to GitHub Pages
+
+# 只发布游戏本体：仓库里的自博弈数据集（约 30MB）不进站点产物。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 组装站点产物
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+          # 页面完全自包含（CSS/JS/权重全内嵌），无需其它资源
+          ls -lh _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
