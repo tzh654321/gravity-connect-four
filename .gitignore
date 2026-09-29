@@ -30,6 +30,8 @@ tools/neural/重力四子棋-nn-test.html
 .workbuddy/
 
 # ============ 杂项 ============
+__pycache__/
+*.pyc
 qc
 Thumbs.db
 Desktop.ini
