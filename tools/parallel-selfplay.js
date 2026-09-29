@@ -28,8 +28,8 @@ function run(jobs){
   return new Promise((resolve, reject) => {
     const t0 = Date.now();
     if (jobs === 1){
-      // 单线程基线：主进程同步跑（无 worker 开销，最接近纯计算耗时）
-      resolve(require('./single-selfplay').runAll(GAMES, DIFF));
+      // 单线程基线：主进程内跑（无 worker 开销，最接近纯计算耗时）
+      require('./single-selfplay').runAll(GAMES, DIFF).then(resolve, reject);
       return;
     }
     let pending = GAMES, done = 0, inflight = 0, qi = 0;
@@ -42,6 +42,7 @@ function run(jobs){
     for (let w = 0; w < jobs; w++){
       const wk = new Worker(path.join(__dirname, 'spa-worker.js'));
       wk.on('message', msg => {
+        if (msg.kind === 'error'){ reject(new Error('[worker] ' + msg.message)); return; }
         if (msg.kind !== 'result') return;
         results.push(msg.r); inflight--; done++;
         if (done === GAMES){ workers.forEach(x => x.postMessage({ kind:'quit' })); finish(); return; }

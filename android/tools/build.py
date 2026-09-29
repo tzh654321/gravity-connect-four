@@ -32,7 +32,33 @@ DEFAULT_JDK = os.environ.get("JAVA_HOME") or r"D:\Program Files\Java\jdk-21"
 DEFAULT_JDK17 = r"D:\Download\_tools\jdk-17"
 
 APP_NAME = "重力四子棋"
-STORE_PASS = "g4g4g4"
+KEY_ALIAS = "g4"
+PASS_FILE = os.path.join(ANDROID, ".keystore-pass")   # 本地口令文件（已在 .gitignore）
+
+
+def resolve_store_pass(cli_value=None):
+    """签名口令来源优先级：命令行 > 环境变量 G4_STORE_PASS > 本地口令文件。
+
+    口令刻意不写进源码：仓库是公开的，源码里的口令等于把整条签名链交出去
+    （他人可签发被系统认可为「同应用更新」的 APK）。
+    """
+    if cli_value:
+        return cli_value
+    env = os.environ.get("G4_STORE_PASS")
+    if env:
+        return env
+    if os.path.isfile(PASS_FILE):
+        with open(PASS_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    return line
+    raise SystemExit(
+        "缺少签名口令，任选一种方式提供：\n"
+        "  1) python build.py --store-pass <口令>\n"
+        "  2) 设置环境变量 G4_STORE_PASS\n"
+        "  3) 在 %s 里写一行口令（该文件不入库）" % PASS_FILE
+    )
 
 
 def log(msg):
@@ -49,13 +75,14 @@ def run(cmd, cwd=None):
 
 
 class Builder:
-    def __init__(self, sdk, jdk, version_name, version_code, work, jdk17=None):
+    def __init__(self, sdk, jdk, version_name, version_code, work, jdk17=None, store_pass=None):
         self.sdk = sdk
         self.jdk = jdk
         self.jdk17 = jdk17 or DEFAULT_JDK17
         self.ver_name = version_name
         self.ver_code = version_code
         self.work = work or self.default_work()
+        self.store_pass = resolve_store_pass(store_pass)
 
         self.bt = os.path.join(sdk, "build-tools", "34.0.0")
         self.platform_jar = os.path.join(sdk, "platforms", "android-34", "android.jar")
@@ -194,9 +221,9 @@ class Builder:
         if os.path.isfile(self.keystore):
             return
         run([self.keytool, "-genkeypair", "-v",
-             "-keystore", self.keystore, "-alias", "g4",
+             "-keystore", self.keystore, "-alias", KEY_ALIAS,
              "-keyalg", "RSA", "-keysize", "2048", "-validity", "10950",
-             "-storepass", STORE_PASS, "-keypass", STORE_PASS,
+             "-storepass", self.store_pass, "-keypass", self.store_pass,
              "-dname", "CN=g4, OU=g4, O=g4, L=CN, S=CN, C=CN"])
         log("已生成签名密钥: " + self.keystore)
 
@@ -209,8 +236,8 @@ class Builder:
             except OSError:
                 pass
         run([self.java, "-jar", self.apksigner, "sign",
-             "--ks", self.keystore, "--ks-key-alias", "g4",
-             "--ks-pass", "pass:" + STORE_PASS, "--key-pass", "pass:" + STORE_PASS,
+             "--ks", self.keystore, "--ks-key-alias", KEY_ALIAS,
+             "--ks-pass", "pass:" + self.store_pass, "--key-pass", "pass:" + self.store_pass,
              "--min-sdk-version", "26", "--out", out, aligned])
         log("签名完成")
         return out
@@ -236,8 +263,10 @@ def main():
     ap.add_argument("--jdk17", default=DEFAULT_JDK17)
     ap.add_argument("--version-name", default="1.0.0")
     ap.add_argument("--version-code", type=int, default=1)
+    ap.add_argument("--store-pass", default=None,
+                    help="签名口令；不传则依次取环境变量 G4_STORE_PASS、android/.keystore-pass")
     a = ap.parse_args()
-    Builder(a.sdk, a.jdk, a.version_name, a.version_code, a.work, a.jdk17).build()
+    Builder(a.sdk, a.jdk, a.version_name, a.version_code, a.work, a.jdk17, a.store_pass).build()
 
 
 if __name__ == "__main__":

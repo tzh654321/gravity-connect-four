@@ -9,7 +9,8 @@
    胜+1/负-1/和 0，games 局求总。基线自身恒为 0 参照。
    每代打印 top 基因与基线胜率；结束输出建议参数 + tune_result.json。
    ============================================================ */
-const fs = require('fs'), path = require('path'), vm = require('vm');
+const fs = require('fs'), path = require('path');
+const { loadGame } = require('./game-sandbox');
 
 const DIR = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(DIR, 'index.html'), 'utf8');
@@ -56,35 +57,11 @@ function inject(html, g){
   return s;
 }
 
-/* ---------- 无头沙箱 ---------- */
-function makeEnv(htmlSrc){
-  const noop = () => {};
-  const ctxStub = () => new Proxy({}, { get(t,p){
-    if (p==='measureText') return ()=>({width:5});
-    if (p==='createRadialGradient'||p==='createLinearGradient') return ()=>({addColorStop:noop});
-    if (p==='canvas') return {width:800,height:600}; return noop; }, set(){ return true; } });
-  const el = () => ({ textContent:'', value:'50', checked:true, style:{}, width:800, height:600,
-    classList:{ _s:new Set(), add(c){this._s.add(c)}, remove(c){this._s.delete(c)},
-      toggle(c){this._s.has(c)?this._s.delete(c):this._s.add(c)}, contains(c){return this._s.has(c)} },
-    addEventListener:noop, appendChild:noop, removeChild:noop, getContext:()=>ctxStub(),
-    getBoundingClientRect:()=>({left:0,top:0,width:800,height:600}), querySelectorAll:()=>[],
-    clientWidth:800, clientHeight:600 });
-  const sb = { console, Math, Date, JSON, Map, Set, Array, Object, String, Number, Boolean,
-    parseInt, parseFloat, isNaN, performance:{now:()=>Date.now()}, requestAnimationFrame:()=>0,
-    cancelAnimationFrame:noop, setTimeout:()=>0, clearTimeout:noop,
-    fetch:()=>Promise.reject(new Error('x')),
-    document:{ getElementById:()=>el(), querySelectorAll:()=>[], addEventListener:noop,
-      createElement:()=>el(), body:{appendChild:noop, removeChild:noop} },
-    window:{ addEventListener:noop, devicePixelRatio:1 }, navigator:{userAgent:'n'},
-    location:{ href:'file:///x.html' } };
-  sb.globalThis = sb;
-  const src = htmlSrc.match(/<script>([\s\S]*?)<\/script>/)[1] +
-    ';globalThis.__G={state,addP,removeP,set occ(v){occ=v},get occ(){return occ},' +
-    'aiChooseMove,placePiece,updateMoving,K,P1,P2,BLOCK};';
-  vm.createContext(sb);
-  vm.runInContext(src, sb, { filename:'g.js' });
-  return sb.__G;
-}
+/* ---------- 无头沙箱：统一走 game-sandbox（含 async AI 所需的 rAF 补丁） ---------- */
+const EXPORT_SPEC =
+  'state,addP,removeP,set occ(v){occ=v},get occ(){return occ},' +
+  'aiChooseMove,placePiece,updateMoving,K,P1,P2,BLOCK';
+const makeEnv = (htmlSrc) => loadGame(htmlSrc, EXPORT_SPEC);
 const drain = G => { let f=0; while (G.state.phase==='falling' && f++ < 800000) G.updateMoving(1/60); };
 
 function resetGame(G){
@@ -93,7 +70,7 @@ function resetGame(G){
 }
 
 /* ---------- 一局：mut 与 base 对弈。返回 +1/-1/0（mut 视角） ---------- */
-function playOnce(mutHtml, firstA, diff){
+async function playOnce(mutHtml, firstA, diff){
   const A = makeEnv(mutHtml), B = makeEnv(HTML);   // B = 基线（源码默认权重）
   resetGame(A); resetGame(B);
   const P1=A.P1, P2=A.P2;
@@ -102,7 +79,7 @@ function playOnce(mutHtml, firstA, diff){
     const cur = mutIsRed ? A : B, oth = mutIsRed ? B : A;
     const me = cur.state.turn;
     cur.state.diff = diff;
-    const d = cur.aiChooseMove();
+    const d = await cur.aiChooseMove();
     if (!d) break;
     cur.placePiece(d, me); drain(cur);
     const lm = cur.state.lastMove;
@@ -118,11 +95,11 @@ function playOnce(mutHtml, firstA, diff){
 }
 
 /* ---------- 个体与基线对弈 games 局（先手交替） ---------- */
-function score(gene, games, diff){
+async function score(gene, games, diff){
   const html = inject(HTML, Object.assign({}, BASE, gene));
   let s = 0, wins = 0;
   for (let i = 0; i < games; i++){
-    const r = playOnce(html, i % 2 === 0, diff);   // 先手交替
+    const r = await playOnce(html, i % 2 === 0, diff);   // 先手交替
     s += r; if (r > 0) wins++;
   }
   return { s, wins };
@@ -160,7 +137,7 @@ async function main(){
   for (let gen = 0; gen <= GENS; gen++){
     for (const ind of pop){
       if (ind.tag === 'BASE' && gen > 0){ ind.fit = 0; continue; }
-      const sc = score(ind.gene, GAMES, DIFF);
+      const sc = await score(ind.gene, GAMES, DIFF);
       ind.fit = sc.s; ind.wins = sc.wins;
     }
     pop.sort((a,b) => b.fit - a.fit);
@@ -191,23 +168,25 @@ async function main(){
 }
 
 if (A.verify){
-  /* 独立验证模式：node tune-weights.js --verify 16 --diff normal
+  /* 独立验证模式：node tools/tune-weights.js --verify 16 --diff normal
      读取 tune_result.json 的 best，与源码基线对弈 N 局（先手交替）报告真实胜率 */
-  const n = +A.verify || 16;
-  const res = JSON.parse(fs.readFileSync(path.join(__dirname, 'tune_result.json'), 'utf8'));
-  const g = res.best;
-  let s = 0, redWin = 0, blueWin = 0;
-  for (let i = 0; i < n; i++){
-    const html = inject(HTML, Object.assign({}, BASE, g));
-    const r = playOnce(html, i % 2 === 0, DIFF);
-    s += r;
-    if (r > 0){ if (i % 2 === 0) redWin++; else blueWin++; }
-  }
-  const pct = ((s + n) / (2 * n) * 100).toFixed(1);
-  console.log('== 独立验证 == 被测(best) vs 基线  ' + n + ' 局 diff=' + DIFF);
-  console.log('被测执红胜 ' + redWin + ' / 执蓝胜 ' + blueWin + ' / 总积分 ' + s + '/' + n +
-              '  折算胜率 ' + pct + '%（>50% 说明确实强于基线）');
-  process.exit(0);
+  (async () => {
+    const n = +A.verify || 16;
+    const res = JSON.parse(fs.readFileSync(path.join(__dirname, 'tune_result.json'), 'utf8'));
+    const g = res.best;
+    let s = 0, redWin = 0, blueWin = 0;
+    for (let i = 0; i < n; i++){
+      const html = inject(HTML, Object.assign({}, BASE, g));
+      const r = await playOnce(html, i % 2 === 0, DIFF);
+      s += r;
+      if (r > 0){ if (i % 2 === 0) redWin++; else blueWin++; }
+    }
+    const pct = ((s + n) / (2 * n) * 100).toFixed(1);
+    console.log('== 独立验证 == 被测(best) vs 基线  ' + n + ' 局 diff=' + DIFF);
+    console.log('被测执红胜 ' + redWin + ' / 执蓝胜 ' + blueWin + ' / 总积分 ' + s + '/' + n +
+                '  折算胜率 ' + pct + '%（>50% 说明确实强于基线）');
+    process.exit(0);
+  })().catch(e => { console.error(e); process.exit(1); });
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

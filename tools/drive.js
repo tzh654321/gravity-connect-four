@@ -3,28 +3,13 @@
    node drive.js MOVE x,y                 人落子（自动让困难AI应一手并打印局面）
    状态存 drive_state.json */
 'use strict';
-const fs = require('fs'), vm = require('vm'), path = require('path');
+const fs = require('fs'), path = require('path');
+const { loadGame } = require('./game-sandbox');
 const FILE = __dirname + '/drive_state.json';
-let src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-src += `;globalThis.__G={state,addP,placePiece,updateMoving,aiChooseMove,computeDanger,K,P1,P2,BLOCK,ownerAt,
-  set occ(v){occ=v},get occ(){return occ},get history(){return history},get danger(){return danger}};`;
-const noop = () => {};
-const cctx = () => new Proxy({}, { get:(t,p)=> p==='measureText'?()=>({width:5})
-  : (p==='createRadialGradient'||p==='createLinearGradient')?()=>({addColorStop:noop})
-  : (p==='canvas')?{width:800,height:600} : noop, set:()=>true });
-const el = () => ({ textContent:'',value:'50',checked:true,style:{},classList:{_s:new Set(),
-  add(c){this._s.add(c)},remove(c){this._s.delete(c)},toggle(c){this._s.has(c)?this._s.delete(c):this._s.add(c)},contains(c){return this._s.has(c)}},
-  addEventListener:noop,appendChild:noop,removeChild:noop,getContext:()=>cctx(),
-  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600}),querySelectorAll:()=>[],clientWidth:800,clientHeight:600 });
-const sb = { console, Math, Date, JSON, Map, Set, performance:{now:()=>Date.now()},
-  requestAnimationFrame:()=>0, cancelAnimationFrame:noop, setTimeout:()=>0, clearTimeout:noop,
-  fetch:()=>Promise.reject(new Error('x')),
-  document:{ getElementById:()=>el(), querySelectorAll:()=>[], addEventListener:noop,
-              createElement:()=>el(), body:{appendChild:noop,removeChild:noop} },
-  window:{ addEventListener:noop, devicePixelRatio:1 }, navigator:{ userAgent:'n' },
-  location:{ href:'file:///x.html' } };
-sb.globalThis = sb; vm.createContext(sb); vm.runInContext(src, sb, { filename:'game.js' });
-const G = sb.__G, P1 = G.P1, P2 = G.P2, K = G.K;
+const G = loadGame(null,
+  'state,addP,placePiece,updateMoving,aiChooseMove,computeDanger,K,P1,P2,BLOCK,ownerAt,' +
+  'set occ(v){occ=v},get occ(){return occ},get history(){return history},get danger(){return danger}');
+const P1 = G.P1, P2 = G.P2, K = G.K;
 const drain = () => { let f=0; while (G.state.phase==='falling' && f++<600000) G.updateMoving(1/60); };
 
 function rebuild(moves){
@@ -76,70 +61,73 @@ function print(moves, tail){
   if (tail) console.log('→ 我方: '+(state_hum==='red'?'红':'蓝')+' @('+last.x+','+last.y+')  [第'+moves.length+'手]');
   console.log('手谱尾: ' + moves.slice(-8).map(m=>(m.o===P1?'R':'B')+'@('+m.x+','+m.y+')').join(' '));
 }
-const cmd = process.argv[2], arg = process.argv[3];
-if (cmd === 'NEW'){
-  state_hum = arg === 'blue' ? 'blue' : 'red';
-  const first = state_hum==='red' ? P1 : P2;   // 人红先/人蓝后
-  const moves = [];
-  rebuild(moves);
-  G.state.turn = first;
-  fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:first }));
-  print(moves,false);
-  console.log('NEW: 你执'+(state_hum==='red'?'红(先手)':'蓝(后手，等红AI先落)')+
-    ' → 命令 MOVE x,y 落子（AI会自动应手）。我执红先走：MOVE 1,0');
-  process.exit(0);
-}
-const st = JSON.parse(fs.readFileSync(FILE,'utf8'));
-state_hum = st.hum;
-let moves = st.moves;
-rebuild(moves);
-if (cmd === 'OPP'){
-  const me = state_hum==='red'?P1:P2;
-  if (G.state.phase==='over'){
+(async () => {
+  const cmd = process.argv[2], arg = process.argv[3];
+  if (cmd === 'NEW'){
+    state_hum = arg === 'blue' ? 'blue' : 'red';
+    const first = state_hum==='red' ? P1 : P2;   // 人红先/人蓝后
+    const moves = [];
+    rebuild(moves);
+    G.state.turn = first;
+    fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:first }));
     print(moves,false);
-    console.log('对局已结束（胜者='+(G.state.winner===P1?'红':'蓝')+'）');
-  } else {
-    G.state.diff = 'hard';
-    const c = G.aiChooseMove();
-    if (c){ const ao = G.state.turn; G.placePiece(c, ao); drain(); moves.push({ o:ao, x:c.x, y:c.y }); }
+    console.log('NEW: 你执'+(state_hum==='red'?'红(先手)':'蓝(后手，等红AI先落)')+
+      ' → 命令 MOVE x,y 落子（AI会自动应手）。我执红先走：MOVE 1,0');
+    process.exit(0);
   }
-  fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:G.state.turn }));
-  G.computeDanger();
-  print(moves, false);
-  if (G.state.phase==='over'){ console.log('胜者='+(G.state.winner===P1?'红':'蓝')+' 总'+moves.length+'手'); }
-  else console.log(G.state.turn===me ? '轮到你了 → MOVE x,y' : '轮到 AI');
-  process.exit(0);
-}
-if (cmd === 'MOVE'){
-  const [x,y] = arg.split(',').map(Number);
-  const me = state_hum==='red'?P1:P2;
-  // 允许投点 vs 落点：为"人"简单——允许直接输入落点坐标（若是静止点则相等）。校验 owner
-  if (G.ownerAt(x,y)!==0){ console.log('非法：( '+x+','+y+') 已有子'); process.exit(1); }
-  const t0=Date.now();
-  const ok = G.placePiece({x,y}, me);
-  drain();
-  if (!ok){ console.log('落子被拒'); process.exit(1); }
-  moves.push({ o:me, x, y });
-  // AI 应一手（若未结束）
-  if (G.state.phase !== 'over'){
-    G.state.diff = 'hard';
-    const c = G.aiChooseMove();
-    if (c){
-      const ao = G.state.turn===P1?P1:P2;
-      G.placePiece(c, ao);
-      drain();
-      moves.push({ o:ao, x:c.x, y:c.y });
+  const st = JSON.parse(fs.readFileSync(FILE,'utf8'));
+  state_hum = st.hum;
+  let moves = st.moves;
+  rebuild(moves);
+  if (cmd === 'OPP'){
+    const me = state_hum==='red'?P1:P2;
+    if (G.state.phase==='over'){
+      print(moves,false);
+      console.log('对局已结束（胜者='+(G.state.winner===P1?'红':'蓝')+'）');
+    } else {
+      G.state.diff = 'hard';
+      const c = await G.aiChooseMove();
+      if (c){ const ao = G.state.turn; G.placePiece(c, ao); drain(); moves.push({ o:ao, x:c.x, y:c.y }); }
+    }
+    fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:G.state.turn }));
+    G.computeDanger();
+    print(moves, false);
+    if (G.state.phase==='over'){ console.log('胜者='+(G.state.winner===P1?'红':'蓝')+' 总'+moves.length+'手'); }
+    else console.log(G.state.turn===me ? '轮到你了 → MOVE x,y' : '轮到 AI');
+    process.exit(0);
+  }
+  if (cmd === 'MOVE'){
+    const [x,y] = arg.split(',').map(Number);
+    const me = state_hum==='red'?P1:P2;
+    // 允许投点 vs 落点：为"人"简单——允许直接输入落点坐标（若是静止点则相等）。校验 owner
+    if (G.ownerAt(x,y)!==0){ console.log('非法：( '+x+','+y+') 已有子'); process.exit(1); }
+    const t0=Date.now();
+    const ok = G.placePiece({x,y}, me);
+    drain();
+    if (!ok){ console.log('落子被拒'); process.exit(1); }
+    moves.push({ o:me, x, y });
+    // AI 应一手（若未结束）
+    if (G.state.phase !== 'over'){
+      G.state.diff = 'hard';
+      const c = await G.aiChooseMove();
+      if (c){
+        const ao = G.state.turn===P1?P1:P2;
+        G.placePiece(c, ao);
+        drain();
+        moves.push({ o:ao, x:c.x, y:c.y });
+      }
+    }
+    G.computeDanger();
+    fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:G.state.turn }));
+    print(moves, true);
+    if (G.state.phase==='over'){ console.log('胜者='+(G.state.winner===P1?'红':'蓝')+' 总'+moves.length+'手');
+      console.log('完整记录：');
+      moves.forEach((m,i)=>console.log((i+1)+'. '+(m.o===P1?'红':'蓝')+' ('+m.x+','+m.y+')'));
+    } else if (G.state.turn === me){
+      console.log('轮到你了 → MOVE x,y');
+    } else {
+      console.log('（AI已应手，轮到你）→ MOVE x,y');
     }
   }
-  G.computeDanger();
-  fs.writeFileSync(FILE, JSON.stringify({ moves, hum:state_hum, turn:G.state.turn }));
-  print(moves, true);
-  if (G.state.phase==='over'){ console.log('胜者='+(G.state.winner===P1?'红':'蓝')+' 总'+moves.length+'手');
-    console.log('完整记录：');
-    moves.forEach((m,i)=>console.log((i+1)+'. '+(m.o===P1?'红':'蓝')+' ('+m.x+','+m.y+')'));
-  } else if (G.state.turn === me){
-    console.log('轮到你了 → MOVE x,y');
-  } else {
-    console.log('（AI已应手，轮到你）→ MOVE x,y');
-  }
-}
+
+})().catch(e => { console.error(e); process.exit(1); });

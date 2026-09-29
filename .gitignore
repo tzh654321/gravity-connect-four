@@ -6,9 +6,9 @@ android/app/src/main/assets/
 *.apk
 *.idsig
 
-# ============ 签名密钥（公开仓库绝不入库）============
-# 注意：android/tools/build.py 里含签名口令，公开前建议改为读环境变量
+# ============ 签名密钥与口令（公开仓库绝不入库）============
 android/g4.keystore
+android/.keystore-pass
 *.keystore
 *.jks
 
