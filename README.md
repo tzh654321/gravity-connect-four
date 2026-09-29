@@ -60,6 +60,11 @@ Windows 下直接双击 `server/一键开房.bat`。手机与电脑连同一个 
 把 `server/server.js` 部署到任意支持 Node 的公网平台，或用 frp / cpolar / ngrok 之类做内网穿透
 拿到一个 **https 域名**，用该域名打开页面即可开房联机 —— **服务端本身就托管页面，邀请链接直接可用，无需改代码**。
 
+- 启动命令：`node server/server.js`。端口按 **命令行参数 > 环境变量 `PORT` > 8765** 取值，
+  所以 Render / Railway / Fly / Cloud Run 这类注入 `PORT` 的平台用默认命令即可，无需改代码。
+- 零依赖、无构建，部署时**只需上传 `server/` 与 `index.html`**（`server.js` 会读上一层的 `index.html`）。
+- 内网穿透下建议用它的 https 域名访问；TLS 由隧道/平台终结，服务端本身仍是明文 HTTP。
+
 > ⚠️ 必须是 **https**：https 页面无法请求 http 后端（混合内容会被浏览器拦掉）。
 
 ### 为什么 GitHub Pages 不能联机

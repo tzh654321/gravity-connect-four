@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /* ==========================================================================
-   重力四子棋 · 局域网联机服务器（零依赖，仅需 Node.js ≥ 18）
+   重力四子棋 · 联机服务器（零依赖，仅需 Node.js ≥ 18）
    --------------------------------------------------------------------------
-   启动：  node server/server.js [端口]        （默认端口 8765）
+   启动：  node server/server.js [端口]        （默认端口 8765，也读环境变量 PORT）
    然后：  本机或局域网内其它设备用浏览器打开控制台打印的地址即可。
+           部署到公网（或内网穿透）后，用那个域名打开即自带在线联机。
    职责：  ① 托管游戏页面（打开即玩）
            ② 房间配对（创建 / 加入）与消息中转（短轮询）
    协议：  游戏物理由双方各自本地确定性演算，网络上只同步
@@ -15,7 +16,10 @@ const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
 
-const PORT   = Number(process.argv[2]) || 8765;
+/* 端口优先级：命令行 > 环境变量 PORT > 8765
+   （云平台/Render/Fly/Cloud Run 等都通过 PORT 注入监听端口，
+     内网穿透一般也允许自定义目标端口） */
+const PORT   = Number(process.argv[2]) || Number(process.env.PORT) || 8765;
 const HTML_FILE = path.join(__dirname, '..', 'index.html');
 // guest 位被占时的「离线判定」时长：超过该时长无任何请求的 guest 可被新玩家顶替
 const GUEST_TIMEOUT = Number(process.env.G4NET_GUEST_TIMEOUT) || 20000;
