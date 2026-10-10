@@ -78,8 +78,10 @@ function verifyTask(t, r) {
   return { ok: null, ms: 0 };
 }
 
+const skipList = argOf('skip', null);              // 按**完整 id** 排除（前缀匹配会误伤 t10 vs t1）
 const TASKS = SUITE.tasks.filter(t =>
-  !onlyFilter || onlyFilter.split(',').some(x => t.id.startsWith(x.trim())));
+  (!onlyFilter || onlyFilter.split(',').some(x => t.id.startsWith(x.trim()))) &&
+  (!skipList || !skipList.split(',').some(x => t.id === x.trim())));
 
 function runOne(t, opts) {
   const board = boardOf(t);
@@ -110,8 +112,11 @@ function runOrderMode() {
         if (rep === 0) {
           const ver = verifyTask(t, r);         // 核验只在第一遍做（贵，且重复核验没有新信息）
           row.verify = ver;
-          if (r.status !== t.expect && !t.budgetCapped) bad(`${t.id} [${v}] 结论 ${r.status} ≠ 期望 ${t.expect}`);
+          // `expect: null` = 这批任务没有先验期望（例如来自其它对局），判据只有"变体结论一致 + 证书过核验"
+          if (t.expect && r.status !== t.expect && !t.budgetCapped) bad(`${t.id} [${v}] 结论 ${r.status} ≠ 期望 ${t.expect}`);
           if (t.verify !== 'none' && ver.ok === false) bad(`${t.id} [${v}] 核验失败：${ver.reason}`);
+        } else if (r.status !== acc[v][t.id].rows[0].r.status) {
+          bad(`${t.id} [${v}] 第 ${rep + 1} 遍结论变成 ${r.status}（排序若不确定会在这里暴露）`);
         }
         acc[v][t.id].ms.push(ms);
         acc[v][t.id].rows.push(row);
@@ -120,56 +125,123 @@ function runOrderMode() {
   }
 
   const base = VARIANTS[0];
-  console.log('\n  ' + '任务'.padEnd(26) + VARIANTS.map(v => ('nodes/' + v).padStart(16)).join('') +
-    VARIANTS.map(v => ('succ/' + v).padStart(14)).join('') + VARIANTS.map(v => ('ms(min)/' + v).padStart(13)).join(''));
-  const mk = () => ({ nodes: 0, succ: 0, ms: 0, ordCalls: 0, ordScores: 0, heap: 0, done: 0, unknown: 0 });
-  const totals = {}, capTotals = {};
-  for (const v of VARIANTS) { totals[v] = mk(); capTotals[v] = mk(); }
+  const med = a => { const s = [...a].sort((x, y) => x - y); const n = s.length;
+    return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+  // 本机噪声地板：用**基线自己**在多次重复里的相对波动（max-min)/median 当标尺；
+  //   变体与基线的差若小于这个地板，就判"收益未确认"，而不是拿单次快慢下结论。
+  const spread = a => { const m = med(a); return m > 0 ? (Math.max(...a) - Math.min(...a)) / m : 0; };
+
+  console.log('\n  ' + '任务'.padEnd(26) + VARIANTS.map(v => ('nodes/' + v).padStart(15)).join('') +
+    VARIANTS.map(v => ('ms(中位)/' + v).padStart(12)).join('') + '  完成状态(' + VARIANTS.join('/') + ')');
+  const mk = () => ({ nodes: 0, succ: 0, ms: 0, ordCalls: 0, ordScores: 0, ordSkipped: 0, heap: 0, done: 0, unknown: 0 });
+  const totals = {}, capTotals = {}, commonTotals = {};
+  for (const v of VARIANTS) { totals[v] = mk(); capTotals[v] = mk(); commonTotals[v] = mk(); }
+  const allDone = t => VARIANTS.every(v => {
+    const rr = acc[v][t.id].rows[0].r;
+    return rr.status !== 'unknown' && !rr.timedOut && !rr.nodeLimit;
+  });
+  const someDone = t => VARIANTS.some(v => {
+    const rr = acc[v][t.id].rows[0].r;
+    return rr.status !== 'unknown' && !rr.timedOut && !rr.nodeLimit;
+  });
+  const changedSet = [];
   for (const t of TASKS) {
     const line = ['  ' + t.id.padEnd(24) + (t.budgetCapped ? ' *' : '')];
-    for (const v of VARIANTS) line.push(String(acc[v][t.id].rows[0].r.nodes).padStart(16));
-    for (const v of VARIANTS) line.push(String(acc[v][t.id].rows[0].r.successors).padStart(14));
-    for (const v of VARIANTS) line.push(String(Math.min(...acc[v][t.id].ms)).padStart(13));
+    for (const v of VARIANTS) line.push(String(acc[v][t.id].rows[0].r.nodes).padStart(15));
+    for (const v of VARIANTS) line.push(String(med(acc[v][t.id].ms)).padStart(12));
+    line.push('  ' + VARIANTS.map(v => {
+      const rr = acc[v][t.id].rows[0].r;
+      return (rr.timedOut || rr.nodeLimit) ? 'budget' : rr.status;
+    }).join(' / '));
     console.log(line.join(''));
     for (const v of VARIANTS) {
       const row = acc[v][t.id].rows[0], rr = row.r;
       const T = t.budgetCapped ? capTotals[v] : totals[v];   // 预算受限任务**不进**可比合计
       T.nodes += rr.nodes; T.succ += rr.successors;
-      T.ms += Math.min(...acc[v][t.id].ms);
-      T.ordCalls += rr.orderCalls; T.ordScores += rr.orderScores;
-      T.heap = Math.max(T.heap, row.heap);
+      T.ms += med(acc[v][t.id].ms);
+      T.ordCalls += rr.orderCalls; T.ordScores += rr.orderScores; T.ordSkipped += rr.orderSkipped || 0;
+      // 峰值堆：取各遍的最大值（仍受 GC 时机影响 ⇒ 只作量级参考）
+      T.heap = Math.max(T.heap, ...acc[v][t.id].rows.map(x => x.heap));
+      if (allDone(t) && !t.budgetCapped) {
+        commonTotals[v].nodes += rr.nodes; commonTotals[v].succ += rr.successors;
+        commonTotals[v].ms += med(acc[v][t.id].ms); commonTotals[v].ordCalls += rr.orderCalls;
+        commonTotals[v].ordScores += rr.orderScores; commonTotals[v].ordSkipped += rr.orderSkipped || 0;
+      }
       if (rr.status === 'unknown' || rr.timedOut || rr.nodeLimit) T.unknown++; else T.done++;
       if (v !== base && rr.status !== acc[base][t.id].rows[0].r.status && !t.budgetCapped) {
         bad(`${t.id} 变体 ${v} 结论 ${rr.status} ≠ ${base} 的 ${acc[base][t.id].rows[0].r.status}`);
       }
     }
+    if (someDone(t) && !allDone(t)) changedSet.push(t);
   }
+  const commonCount = TASKS.filter(t => allDone(t) && !t.budgetCapped).length;
   console.log('  ' + '—'.repeat(26 + VARIANTS.length * 43));
-  console.log(`  【预算内完成的任务】${TASKS.length - TASKS.filter(t => t.budgetCapped).length} 个 ` +
-    `⇒ 这是**唯一可比**的部分（带 * 的预算受限任务单独统计）：`);
+  console.log(`  【全部变体都完成的任务】${commonCount} 个 —— 这是**共同完成集合**的成本（` +
+    `单次取最小不适合确认小幅差异 ⇒ 这里报**中位数**）：`);
+  console.log(`    节点    ${VARIANTS.map(v => v + '=' + commonTotals[v].nodes).join('  ')}`);
+  console.log(`    后继    ${VARIANTS.map(v => v + '=' + commonTotals[v].succ).join('  ')}`);
+  console.log(`    ms(中位) ${VARIANTS.map(v => v + '=' + commonTotals[v].ms).join('  ')}`);
+  console.log(`    评分调用 ${VARIANTS.map(v => v + '=' + commonTotals[v].ordCalls).join('  ')}  ` +
+    `评分次数 ${VARIANTS.map(v => v + '=' + commonTotals[v].ordScores).join('  ')}` +
+    (VARIANTS.some(v => commonTotals[v].ordSkipped)
+      ? `  深层跳过 ${VARIANTS.map(v => v + '=' + commonTotals[v].ordSkipped).join('  ')}` : ''));
+  console.log(`  【预算内完成的任务（含"只有一个变体完成"的）】${TASKS.length - TASKS.filter(t => t.budgetCapped).length} 个：`);
   console.log(`    节点    ${VARIANTS.map(v => v + '=' + totals[v].nodes).join('  ')}`);
-  console.log(`    后继    ${VARIANTS.map(v => v + '=' + totals[v].succ).join('  ')}`);
-  console.log(`    ms(min) ${VARIANTS.map(v => v + '=' + totals[v].ms).join('  ')}`);
-  console.log(`    峰值堆  ${VARIANTS.map(v => v + '=' + (totals[v].heap / 1048576).toFixed(0) + 'MB').join('  ')}`);
-  for (const v of VARIANTS) if (totals[v].ordCalls)
-    console.log(`    ${v}：排序调用 ${totals[v].ordCalls}、评分次数 ${totals[v].ordScores}`);
+  console.log(`    ms(中位) ${VARIANTS.map(v => v + '=' + totals[v].ms).join('  ')}`);
+  console.log(`    峰值堆  ${VARIANTS.map(v => v + '=' + (totals[v].heap / 1048576).toFixed(0) + 'MB').join('  ')}` +
+    `（受 GC 时机影响，只作量级参考）`);
   if (TASKS.some(t => t.budgetCapped)) {
     console.log(`  【预算受限任务】${TASKS.filter(t => t.budgetCapped).length} 个，只记资源、**不判优劣**：`);
     console.log(`    节点 ${VARIANTS.map(v => v + '=' + capTotals[v].nodes).join('  ')}  ` +
-      `ms(min) ${VARIANTS.map(v => v + '=' + capTotals[v].ms).join('  ')}`);
+      `ms(中位) ${VARIANTS.map(v => v + '=' + capTotals[v].ms).join('  ')}`);
+  }
+  if (changedSet.length) {
+    console.log('  ⚠ **完成集合发生变化**（有的变体做完了、有的没做完）—— 这些任务**不能被排除后只比共同项**：');
+    for (const t of changedSet) {
+      console.log('      ' + t.id.padEnd(24) +
+        VARIANTS.map(v => {
+          const rr = acc[v][t.id].rows[0].r;
+          return v + '=' + ((rr.timedOut || rr.nodeLimit) ? 'budget' : rr.status);
+        }).join('  '));
+    }
   }
   if (VARIANTS.length >= 2) {
+    // 配对比较：因为变体是**交替**执行的，同一 rep 内相邻 ⇒ 可以逐 rep 配对相减
     const b = totals[base];
     const rel = (k, c) => (b[k] > 0 ? ((c / b[k] - 1) * 100).toFixed(1) + '%' : '—');  // 正=更差
-    console.log('\n  相对基线 ' + base + '（**正=更差、负=更好**；只算预算内完成的任务）：');
-    for (const v of VARIANTS.slice(1)) {
-      const d = totals[v];
-      const disagree = (d.nodes - b.nodes) * (d.ms - b.ms) < 0
-        ? '  ⚠ 与墙钟不一致：节点更少却更慢 ⇒ 每节点成本上升吃掉了节点收益' : '';
-      console.log(`    ${v.padEnd(6)} 节点 ${rel('nodes', d.nodes).padStart(7)}  后继 ${rel('succ', d.succ).padStart(7)}  ` +
-        `ms(min) ${rel('ms', d.ms).padStart(7)}${disagree}`);
+    // 噪声地板用**每遍总耗时**的波动（不是逐任务相对波动的中位数）：
+    //   后者会被 1ms 级的小任务主导（它们的相对波动天然几百 %），把地板抬得毫无意义。
+    // 用**每遍总耗时**而不是逐任务相对波动（后者会被 1ms 级小任务抬到几百 %）；
+    // 且用**中位绝对偏差**而不是 (max-min)/median —— 后者会被"某一遍整体卡顿"这种单离群值主导
+    //   （实测出现过 2383/2337/2314/2302/**4117**ms：只有一遍异常，全距却给出 78% 的假地板）。
+    const perRep = [];
+    for (let rep = 0; rep < repeat; rep++) {
+      perRep.push(TASKS.filter(t => !t.budgetCapped)
+        .reduce((s, t) => s + acc[base][t.id].ms[rep], 0));
     }
-    console.log('  ⚠ 节点更少 ≠ 同比提速；毫秒取了多次最小值也只是辅助，本机抖动可达 ±20%。');
+    const m0 = med(perRep);
+    const noiseMed = m0 > 0 ? med(perRep.map(x => Math.abs(x - m0))) / m0 : 0;
+    console.log('\n  相对基线 ' + base + '（**正=更差、负=更好**；共同完成集合 + 中位数）：');
+    for (const v of VARIANTS.slice(1)) {
+      const bc = commonTotals[base], d = commonTotals[v];
+      const relc = k => (bc[k] > 0 ? ((d[k] / bc[k] - 1) * 100).toFixed(1) + '%' : '—');
+      // 逐任务配对差（同一 rep）取中位数，比"两个中位数相减"更抗漂移
+      const pairs = TASKS.filter(t => allDone(t) && !t.budgetCapped).map(t => {
+        const a = acc[base][t.id].ms, c = acc[v][t.id].ms;
+        return med(a.map((x, i) => c[i] - x));
+      });
+      const pairMed = pairs.length ? med(pairs) : 0;
+      const verdict = Math.abs(Number(relc('ms').replace('%', ''))) <= noiseMed * 100
+        ? `  ⇒ 差异小于本机噪声地板（基线每遍总耗时的中位绝对偏差 ${(noiseMed * 100).toFixed(1)}%，` +
+          `各遍 ${perRep.join('/')}ms）：**收益未确认**`
+        : (Number(relc('ms').replace('%', '')) < 0 ? '  ⇒ 超出噪声地板，方向为**净收益**' : '  ⇒ 超出噪声地板，方向为**净退化**');
+      console.log(`    ${v.padEnd(10)} 节点 ${relc('nodes').padStart(7)}  后继 ${relc('succ').padStart(7)}  ` +
+        `ms(中位) ${relc('ms').padStart(7)}  配对差中位 ${String(Math.round(pairMed)).padStart(6)}ms`);
+      console.log(`               评分调用 ${d.ordCalls}（基线 ${bc.ordCalls}）评分次数 ${d.ordScores}（基线 ${bc.ordScores}）` +
+        (d.ordSkipped || bc.ordSkipped ? ` 深层跳过 ${d.ordSkipped}` : ''));
+      console.log(`               ${verdict}`);
+    }
+    console.log('  ⚠ 判据是**总求解成本**（耗时、完成集合、评分开销、内存）；节点数只用来解释，不当结论。');
   }
   return totals;
 }

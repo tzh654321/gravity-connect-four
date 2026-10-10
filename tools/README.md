@@ -66,7 +66,7 @@ node tools/check-net-hint.js                              # 回归：联机入�
 | `inject-cert.js` | 把 `cert-bundle.json` 内联进 `index.html`（`--check` 校验同步）；**只嵌数据**，页面查询逻辑是静态代码 |
 | `cert-loop.js` | **在线闭环的事件回放验收**：关键局面真实选招 / 从 rows 重建证书双核验 / 页面跟随⇄数据逐状态 / 完整跟随（对手全覆盖）/ 偏离即作废 / 悔棋重开导入换档 / 迟到响应 / 旋转坐标还原 / 普通对局开销 |
 | `check-dfpn-order.js` | **DFPN 后继排序的回归**（P8-2）：默认路径锚点不变（`ply4(1,-1) N=8` = 10194 节点、`THREAT N=12` = 5732 / 3099 / 266）／三种 order 结论必须一致／每份证书都过库内+规则层（⇒ 没少走法）／同一 order 跑两次逐位可复现／`orderCalls==expansions` 且未知取值回落 `none` |
-| `bench-holdout.json` | **留出集**（13 个任务，2026-10-10 在实现排序**之前**固定）：只用来决定"是否默认启用"，不用于选规则/调权重。期望全部由已独立核验的夹具数据推出，不新跑对局；**预算受限任务单列**，不进可比合计 |
+| `bench-other-games.json` | **不同源任务集**（11 个，P8-3）：来自 `bench-games-v2.jsonl` 的 9 局（**都不是** ply4 来源局 `hard\|P1#7`）在 ply 10/12 去重后的棋盘；`attacker = 3 − 行棋方`、N 固定 9。**没有先验期望**（`expect: null`），正确性判据只有"变体结论一致 + 证书双层核验" |
 | `bench-suite.js` | **固定搜索基准 + 成本剖析**：读 `tools/fixtures/bench-suite.json`（10 个固定任务：浅证胜/反证、P3 连续威胁、含安静手证胜、较大 horizon 反证、固定预算内未知），**冷/热两趟对照**分别测"每任务全新缓存"与"跨任务共享缓存"；把**搜索 / 证书导出（核心内计数）/ 独立核验**分开计时，并记录 TT 命中、重复率、峰值堆。**节点/秒只作辅助指标**。排序对照用 `--mode order --order none,block,shape --repeat 2`（变体在内层**交替**执行、毫秒取 min），留出集用 `--suite` |
 | ⚠ **度量口径（基准类实验通用）** | 本机**墙钟抖动可达 ±20%**（同一任务节点数逐位一致却跑出 23.8s / 34.9s）⇒ 判断"优化是否有效"必须用**确定性指标**：核心给每个 `boundCache` 累加 `searchNodes` / `searchCalls`（纯诊断字段，由 `dfpnSearch` 写入），「同一流水线在有/无复用下的**节点数之差**」才是可靠读数，墙钟只作辅助。做对照时用 `createBoundCache(0)`（`maxEntries=0` ⇒ `boundStore` 永不写入 ⇒ 复用完全不生效，但计数照常累加）当对照组 |
 | `check-bound-reuse.js` | **有界结论区间复用（L/U 表）的回归**：单调性（`refuted` 向下封闭 / `proven-win` 向上封闭，复用结论必须与真搜一致）、复用证书的**两层核验**、五条负向对照（未完成结论不得写入 / 只改 `maxPlies` 不截断必须被拒 / 获胜树深度 > N 不得复用 / 反证证书 `maxPlies` < N 不得复用 / 结论命中但无证书必须真搜）、结论与证书分离；E 组验**确定性成本度量**（`searchNodes`/`searchCalls` 累加、`maxEntries=0` 对照组永不写入、相同预算下节点数可复现、复用命中记 0 节点） |
@@ -115,8 +115,9 @@ node tools/cert-boundary.js --splice --ply 6 --attacker 2 --N 2 --add 2     # �
 node tools/invariant-probe.js                               # 不变量候选 + 反例搜索（口径已修正）
 node tools/cert-scan.js                                     # 策略库价值评估（命中率 / 走法改变 / 决策价值出现率）
 node tools/bench-suite.js                                   # 开发集 + 成本剖析（冷/热 boundCache 对照）
-node tools/bench-suite.js --suite tools/fixtures/bench-holdout.json --mode order --order none   # 留出集基线
-node tools/bench-suite.js --mode order --order none,block,shape --repeat 2   # 后继排序对照（交替 + 取 min）
+node tools/bench-suite.js --suite tools/fixtures/bench-holdout.json --mode order --order none   # 同源确认集基线
+node tools/bench-suite.js --mode order --order none,shape,shape-top --repeat 5   # 后继排序对照（交替 + 中位数 + 配对差）
+node tools/bench-suite.js --mode order --order none,shape,shape-top --repeat 3 --skip t10-ply4b102-unbounded  # 排除时间盒任务
 node tools/check-dfpn-order.js                              # DFPN 后继排序回归（默认路径锚点 + 结论一致 + 两层核验）
 node tools/check-bound-reuse.js                             # 有界结论区间复用（L/U）回归
 node tools/make-cert-bundle.js --boundCache 1                # 离线流水线（默认，共享缓存 ⇒ 重复查询走复用）

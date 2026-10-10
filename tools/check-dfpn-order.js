@@ -83,7 +83,7 @@ console.log('A 默认路径（order 未传）必须逐位不变');
 }
 
 /* ---------- B/C：结论一致 + 两层核验 ---------- */
-const MODES = ['none', 'block', 'shape'];
+const MODES = ['none', 'block', 'shape', 'shape-top'];
 console.log('\nB/C 三个模式的结论必须与 none 一致，且证书都要过两层核验');
 const results = {};
 for (const c of CASES) {
@@ -131,6 +131,16 @@ console.log('\nD 排序确实被启用（诊断字段自洽）');
   if (none.orderCalls !== 0) bad('none 模式不应有排序调用');
   chk(blk, 'block', false);
   chk(shp, 'shape', true);
+  // shape-top：**只有根附近 2 层评分**，更深的展开必须完全跳过（orderSkipped）
+  const top = dfpnSearch(c.board, c.attacker, { maxPlies: c.maxPlies, maxNodes: c.maxNodes, timeMs: c.timeMs, order: 'shape-top' });
+  if (!(top.orderSkipped > 0) || !(top.orderCalls > 0) ||
+      top.orderCalls + top.orderSkipped !== top.expansions)
+    bad(`shape-top 计数不自洽：calls=${top.orderCalls} skipped=${top.orderSkipped} expansions=${top.expansions}`);
+  else if (!(top.orderCalls < shp.orderCalls / 10))
+    bad(`shape-top 应当大幅减少评分调用：${top.orderCalls} vs shape 的 ${shp.orderCalls}`);
+  else ok(`shape-top 展开 ${top.expansions} 次 ⇒ 只给 ${top.orderCalls} 次评分（shape 是 ${shp.orderCalls}），` +
+    `跳过 ${top.orderSkipped} 次`);
+  if (top.status !== none.status) bad(`shape-top 结论 ${top.status} ≠ none 的 ${none.status}`);
   // 非法模式必须回落到 none（拼写错误不能悄悄变成"某种排序"）
   const typo = dfpnSearch(c.board, c.attacker, { maxPlies: c.maxPlies, maxNodes: c.maxNodes, timeMs: c.timeMs, order: 'shapped' });
   if (typo.nodes !== none.nodes) bad(`未知 order 值未回落到 none：${typo.nodes} vs ${none.nodes}`);

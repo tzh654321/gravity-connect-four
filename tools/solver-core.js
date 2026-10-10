@@ -1322,7 +1322,10 @@
       // 后继排序（实验开关，**默认 'none'**）：'block' = 只把"必须挡"的一步提到最前；
       // 'shape' = 再叠加 alpha-beta 已有的棋型分。见 orderKids。
       order: 'none', diag: false }, options);
-    const orderMode = cfg.order === 'shape' || cfg.order === 'block' ? cfg.order : 'none';
+    // ⚠ `shape-top` 的 2 是**预先固定的实验选择**（不做深度扫描再挑最好看的），见 docs/07 §十四.6
+    const TOP_PLIES = 2;
+    const orderMode = cfg.order === 'shape' || cfg.order === 'block' || cfg.order === 'shape-top'
+      ? cfg.order : 'none';
     const diag = !!cfg.diag;
     const started = Date.now(), deadline = started + cfg.timeMs;
     // maxPlies > 0 时进入"**深度受限**"模式：把"剩 0 半回合"当作伪终点（attacker 无法再赢），
@@ -1336,7 +1339,7 @@
     const st = { nodes: 0, expansions: 0, descents: 0, ttHits: 0, iters: 0, maxDepth: 0,
       timedOut: false, nodeLimit: false,
       // 后继生成数与排序开销（实验度量；默认 'none' 时 orderCalls/orderScores 恒为 0）
-      successors: 0, orderCalls: 0, orderScores: 0,
+      successors: 0, orderCalls: 0, orderScores: 0, orderSkipped: 0,
       // 诊断拆分（只在 diag=true 时统计，默认不进热路径）：TT 命中里"节点已有结论值"的那部分
       ttHitsResolved: 0,
       stateKeys: 0, winScans: 0, msExtract: 0 };   // 成本剖析计数（纯诊断，不影响语义）
@@ -1354,6 +1357,7 @@
           ms: Date.now() - started, maxDepth: 0, pn: 0, dn: 0, rootSide, ttSize: 0,
       maxPlies: cfg.maxPlies, timedOut: false, nodeLimit: false,
       stateKeys: 0, winScans: 0, msExtract: 0, successors: 0, orderCalls: 0, orderScores: 0,
+      orderSkipped: 0,
       ttHitsResolved: 0, bound: { L: hit.L, U: hit.U } });
         // ⚠ 两类证书各自带距离条件，缺一不可（否则会用"深度 8 的获胜树"回答"能否在 ≤3 内赢"）
         if (hit.status === 'proven-win' && rec && rec.winCert && rec.winCert.depth <= cfg.maxPlies) {
@@ -1457,15 +1461,25 @@
        两层，都建立在**已经算出来的数据**之上：
          ① `block`：把"必须挡"的那一手提到最前。**零额外局面扫描**（坐标来自 nodeAt 的终局判定）。
          ② `shape`：再叠加 alpha-beta 已有的 `order()` 棋型分（每次展开算一次，O(走法数 × 24 次查表)）。
+         ③ `shape-top`：**只在距本次搜索根 ≤2 个半回合的节点上**用 ②，更深的节点完全按 `none` 的原顺序。
+            （2 是预先固定的实验值，不是扫参挑出来的。）
+       ⚠ 关于"是不是已经在首次展开排序"：**是** —— `expand` 只在 `!n.kids` 时被调用，且一定把 `kids` 设上，
+         所以**每个节点每次搜索只会展开一次**（下面那个断言就是守这条的）。不要把"首次展开才排序"当成新优化。
        视角按**当前行棋方**切换（这是必须的）：攻击方 OR 节点偏向自己的棋型 / 挡住对手的即时胜点；
        防守方 AND 节点偏向挡住攻击方的即时胜点 / 自己的反击棋型。**不是**两边都用"攻击方棋型越好越优先"。
        最后一级是坐标序 ⇒ 结果确定可复现。
        ⚠ 不为排序额外跑造叉（forkMove）或二次胜点扫描 —— 那正是此前"局部维护反而更慢"的覆辙。 */
-    const orderKids = (n, p) => {
+    const orderKids = (n, p, depth) => {
       if (orderMode === 'none') return p.moves();
+      let m = orderMode;
+      if (orderMode === 'shape-top') {
+        // 深层节点：**完全不付排序成本**（连 block 都不做 ⇒ 与 none 逐位一致的顺序）
+        if (depth > TOP_PLIES) { st.orderSkipped++; return p.moves(); }
+        m = 'shape';
+      }
       st.orderCalls++;
       let ms;
-      if (orderMode === 'shape') {
+      if (m === 'shape') {
         ms = order(p, p.moves(), n.side, null);
         st.orderScores += ms.length;
         ms = ms.slice();
@@ -1481,10 +1495,11 @@
       }
       return ms;
     };
-    const expand = (n, p) => {
+    const expand = (n, p, depth) => {
+      if (n.kids) throw new Error('内部错误：同一个节点被展开两次（这会让"首次展开才排序"不再成立）');
       st.expansions++;
       if (st.expansions > cfg.maxNodes) { st.nodeLimit = true; throw STOPD; }
-      const ms = orderKids(n, p);                   // 'none' 时与改动前逐位相同
+      const ms = orderKids(n, p, depth);            // 'none' 时与改动前逐位相同
       const k = new Array(ms.length);
       for (let i = 0; i < ms.length; i++) k[i] = { move: ms[i], pn: 1, dn: 1, node: null };
       n.kids = k;
@@ -1504,7 +1519,7 @@
     //      另一侧按"其余子节点已提供的量"扣减，两侧恒大于子节点当前值 ⇒ 每次下潜必有进展。
     const step = (n, p, thpn, thdn, depth) => {
       if (n.term) return;
-      if (!n.kids) { expand(n, p); return; }
+      if (!n.kids) { expand(n, p, depth); return; }
       st.descents++;
       if (depth > st.maxDepth) st.maxDepth = depth;
       if ((st.descents & 1023) === 0 && Date.now() >= deadline) throw STOPD;
@@ -1667,6 +1682,7 @@
       pn: root.pn, dn: root.dn, rootSide, ttSize: tt.size, maxPlies: bounded ? cfg.maxPlies : null,
       timedOut: st.timedOut, nodeLimit: st.nodeLimit,
       successors: st.successors, orderCalls: st.orderCalls, orderScores: st.orderScores,
+      orderSkipped: st.orderSkipped,
       ttHitsResolved: st.ttHitsResolved,
       stateKeys: st.stateKeys, winScans: st.winScans, msExtract: st.msExtract };
     /* 只有**已完成**的结论才写进区间表（预算耗尽/部分展开一律不写）；
