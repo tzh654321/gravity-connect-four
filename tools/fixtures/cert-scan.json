@@ -1,0 +1,116 @@
+{
+  "bundle": "tools/fixtures/cert-bundle.json",
+  "builtAt": "2026-10-10T11:24:35.938Z",
+  "ruleVersion": "g4-rules-1",
+  "entries": [
+    {
+      "id": "bounded-ply4",
+      "sourceGame": "hard|P1#7",
+      "verdictHorizon": 13,
+      "executableHorizons": [
+        {
+          "move": {
+            "x": 0,
+            "y": -2
+          },
+          "horizon": 6,
+          "source": "independent-solve",
+          "agreementPct": 61
+        },
+        {
+          "move": {
+            "x": 1,
+            "y": -1
+          },
+          "horizon": 6,
+          "source": "independent-solve",
+          "agreementPct": 73.3
+        }
+      ]
+    }
+  ],
+  "hits": [
+    {
+      "set": "开发集·来源局",
+      "games": 1,
+      "positions": 18,
+      "exact": 1,
+      "rotated": 0,
+      "unique": 1,
+      "changedMove": 1
+    },
+    {
+      "set": "开发集·其余局",
+      "games": 5,
+      "positions": 167,
+      "exact": 0,
+      "rotated": 0,
+      "unique": 0,
+      "changedMove": 0
+    },
+    {
+      "set": "留出集",
+      "games": 9,
+      "positions": 214,
+      "exact": 0,
+      "rotated": 0,
+      "unique": 0,
+      "changedMove": 0
+    },
+    {
+      "set": "全部",
+      "games": 15,
+      "positions": 399,
+      "exact": 1,
+      "rotated": 0,
+      "unique": 1,
+      "changedMove": 1
+    }
+  ],
+  "changed": [
+    {
+      "game": "hard|P1#7",
+      "ply": 4,
+      "played": {
+        "x": 1,
+        "y": 0
+      },
+      "cert": {
+        "x": 1,
+        "y": -1
+      },
+      "kind": "exact"
+    }
+  ],
+  "prevalence": [
+    {
+      "checked": 60,
+      "doomedPlayed": 6,
+      "hasAlt": 0
+    },
+    {
+      "checked": 60,
+      "doomedPlayed": 2,
+      "hasAlt": 0
+    }
+  ],
+  "sample": {
+    "n": 60,
+    "plies": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "horizon": 6,
+    "budgetMs": 3000,
+    "budgetNodes": 120000
+  },
+  "conclusion": "单点证书在来源局之外零命中（含旋转等价），且便宜的有界判定改变不了决策 ⇒ 不扩库"
+}

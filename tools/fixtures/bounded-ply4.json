@@ -1,0 +1,201 @@
+{
+  "note": "由 tools/make-bounded-fixtures.js 生成。命题口径：**有界博弈** —— 「某方能否在 ≤N 半回合内强制连四」；半回合 = 一次落子。连四立即获胜，半回合用尽仍未分胜负记和棋。refuted 表示\"确切的：无法在 ≤N 半回合内强制连四\"，**不是**\"永远赢不了\"。",
+  "source": {
+    "records": "tools/bench-games-lean.jsonl",
+    "game": "hard|P1#7",
+    "ply": 4,
+    "start": [
+      [
+        "0,0",
+        3
+      ]
+    ]
+  },
+  "board": [
+    [
+      "0,0",
+      3
+    ],
+    [
+      "-1,0",
+      1
+    ],
+    [
+      "-1,-1",
+      2
+    ],
+    [
+      "0,1",
+      1
+    ],
+    [
+      "0,-1",
+      2
+    ]
+  ],
+  "sideToMove": 1,
+  "attacker": 2,
+  "budget": {
+    "maxNodes": 3000000,
+    "timeMs": 600000
+  },
+  "scanUpTo": 16,
+  "moves": [
+    {
+      "move": {
+        "x": 1,
+        "y": 0
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "proven-win-within-N",
+      "minWinDepth": 13,
+      "maxRefuted": null,
+      "winTree": {
+        "nodes": 210,
+        "leaves": 159,
+        "depth": 11,
+        "hash": "e9ac013dcf54888e36c240e1d060ff3d42daedcb5a90d4016baf748ac6c75cec",
+        "verified": true
+      }
+    },
+    {
+      "move": {
+        "x": -2,
+        "y": 0
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "proven-win-within-N",
+      "minWinDepth": 3,
+      "maxRefuted": null,
+      "winTree": {
+        "nodes": 2,
+        "leaves": 1,
+        "depth": 1,
+        "hash": "1dce7ae93b6168acdc4489e4b223df97137c3439b2ea9fba4444de74d658d489",
+        "verified": true
+      }
+    },
+    {
+      "move": {
+        "x": -1,
+        "y": 1
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "proven-win-within-N",
+      "minWinDepth": 7,
+      "maxRefuted": null,
+      "winTree": {
+        "nodes": 59,
+        "leaves": 31,
+        "depth": 5,
+        "hash": "539aa5bc5934c2fbbf6abfc04c4cbb9a2e69048787d5d29920cf428b9bfdb08f",
+        "verified": true
+      }
+    },
+    {
+      "move": {
+        "x": -1,
+        "y": -2
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "proven-win-within-N",
+      "minWinDepth": 7,
+      "maxRefuted": null,
+      "winTree": {
+        "nodes": 52,
+        "leaves": 24,
+        "depth": 5,
+        "hash": "81f4ddfe8bdd15d3ac8c2c207e3d42c468d9b125813f7a624caab6d5fcb181fa",
+        "verified": true
+      }
+    },
+    {
+      "move": {
+        "x": 0,
+        "y": 2
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "proven-win-within-N",
+      "minWinDepth": 9,
+      "maxRefuted": null,
+      "winTree": {
+        "nodes": 172,
+        "leaves": 81,
+        "depth": 7,
+        "hash": "ade82ae03cde445e2f6c28f3cde3038fdc7af959690c11fc846465513ff2d970",
+        "verified": true
+      }
+    },
+    {
+      "move": {
+        "x": 1,
+        "y": -1
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "refuted-up-to-N",
+      "minWinDepth": null,
+      "maxRefuted": 16,
+      "unknownAt": [],
+      "defence": {
+        "nodes": 76405,
+        "leaves": 34850,
+        "depth": 16,
+        "hash": "e055d9ee711bb6f4a06feb6e1b63ebf276ebe731b11cd26975bca184e24f90d9",
+        "verified": true
+      },
+      "self": {
+        "result": "refuted-up-to-N",
+        "maxRefuted": 19,
+        "unknownAt": [],
+        "defence": {
+          "nodes": 12048,
+          "leaves": 5507,
+          "depth": 19,
+          "hash": "5da204b69463841663eef3106b5fe813f3f603ba2a71a1b52302173fd4bd4136",
+          "verified": true
+        }
+      }
+    },
+    {
+      "move": {
+        "x": 0,
+        "y": -2
+      },
+      "attacker": 2,
+      "maxPliesTested": 16,
+      "result": "refuted-up-to-N",
+      "minWinDepth": null,
+      "maxRefuted": 16,
+      "unknownAt": [],
+      "defence": {
+        "nodes": 169813,
+        "leaves": 77494,
+        "depth": 16,
+        "hash": "c3f9efb14b18cd88603b5c6ba76cb9c3ba7ff71c7821f852ae6c9f5cabcc6556",
+        "verified": true
+      },
+      "self": {
+        "result": "refuted-up-to-N",
+        "maxRefuted": 17,
+        "unknownAt": [
+          18,
+          19
+        ],
+        "defence": {
+          "nodes": 18774,
+          "leaves": 8542,
+          "depth": 17,
+          "hash": "5b576ebec83300a9b19d961ca112c55c075bc435c761634e747392eca88e9c8c",
+          "verified": true
+        }
+      }
+    }
+  ],
+  "certFile": "tools/fixtures/bounded-ply4-certs.jsonl"
+}

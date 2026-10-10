@@ -1,0 +1,273 @@
+{
+ "note": "固定搜索基准集（P8）。目的：在**固定局面 + 固定命题**上比较\"得到同一可靠结论\"的成本，而不是追求未知任务的 pn 变小。每个任务固定：棋盘 / 攻击方 / 有界或无界 + horizon / 预算 / 预期结论 / 核验方式。同一局面不同 horizon 视为**不同任务**，但用 id 前缀分组以测跨深度复用。",
+ "conventions": {
+  "attacker": "固定攻击方（1/2）",
+  "maxPlies": ">0 表示有界命题「该方能否在 ≤maxPlies 半回合内强制连四」；0 表示无界",
+  "expect": "期望结论：proven-win / refuted / unknown",
+  "group": "同组 = 同一 (棋盘, 攻击方)，不同 horizon；用于量化跨 horizon 复用"
+ },
+ "tasks": [
+  {
+   "id": "t1-shallow-refute-n2",
+   "kind": "浅反证（基本开销）",
+   "group": "tiny",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     1
+    ],
+    [
+     "0,2",
+     2
+    ]
+   ],
+   "attacker": 2,
+   "maxPlies": 2,
+   "maxNodes": 200000,
+   "timeMs": 20000,
+   "expect": "refuted",
+   "verify": "refutation"
+  },
+  {
+   "id": "t2-shallow-win-n1",
+   "kind": "浅证胜（一步获胜）",
+   "group": "win1",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "2,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ]
+   ],
+   "attacker": 1,
+   "maxPlies": 1,
+   "maxNodes": 200000,
+   "timeMs": 20000,
+   "expect": "proven-win",
+   "verify": "strategy",
+   "note": "P1 在 y=-1 有三连，胜点 (3,-1)；轮到 P1 ⇒ 1 半回合内证胜"
+  },
+  {
+   "id": "t3-threat-n3",
+   "kind": "P3 连续威胁（浅）",
+   "group": "threat",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "-1,0",
+     2
+    ],
+    [
+     "2,0",
+     1
+    ],
+    [
+     "3,0",
+     2
+    ]
+   ],
+   "attacker": 1,
+   "maxPlies": 3,
+   "maxNodes": 400000,
+   "timeMs": 30000,
+   "expect": "proven-win",
+   "verify": "strategy"
+  },
+  {
+   "id": "t4-threat-n8",
+   "kind": "P3 连续威胁（更大 horizon）",
+   "group": "threat",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "-1,0",
+     2
+    ],
+    [
+     "2,0",
+     1
+    ],
+    [
+     "3,0",
+     2
+    ]
+   ],
+   "attacker": 1,
+   "maxPlies": 8,
+   "maxNodes": 400000,
+   "timeMs": 30000,
+   "expect": "proven-win",
+   "verify": "strategy",
+   "note": "同组：应被 t3 的 U 覆盖 ⇒ 期望走复用"
+  },
+  {
+   "id": "t5-quiet-win-n12",
+   "kind": "含安静手的证胜（真正的完整搜索）",
+   "group": "quiet",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "0,-2",
+     1
+    ],
+    [
+     "0,-3",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "2,0",
+     2
+    ]
+   ],
+   "attacker": 1,
+   "maxPlies": 12,
+   "maxNodes": 400000,
+   "timeMs": 60000,
+   "expect": "proven-win",
+   "verify": "strategy"
+  },
+  {
+   "id": "t6-ply4b102-n8",
+   "kind": "有界反证（中等）",
+   "group": "ply4b102",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "maxPlies": 8,
+   "maxNodes": 400000,
+   "timeMs": 30000,
+   "expect": "refuted",
+   "verify": "refutation"
+  },
+  {
+   "id": "t7-ply4b102-n4",
+   "kind": "有界反证（同组、更小 horizon）",
+   "group": "ply4b102",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "maxPlies": 4,
+   "maxNodes": 400000,
+   "timeMs": 30000,
+   "expect": "refuted",
+   "verify": "refutation",
+   "note": "同组：应被 t6 的 L 覆盖 ⇒ 期望走截断复用"
+  },
+  {
+   "id": "t8-ply4b102-n12",
+   "kind": "有界反证（较大 horizon）",
+   "group": "ply4b102",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "maxPlies": 12,
+   "maxNodes": 1500000,
+   "timeMs": 120000,
+   "expect": "refuted",
+   "verify": "refutation"
+  },
+  {
+   "id": "t9-ply4b102-n16",
+   "kind": "有界反证（最贵的全分支任务）",
+   "group": "ply4b102",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "maxPlies": 16,
+   "maxNodes": 6000000,
+   "timeMs": 300000,
+   "expect": "refuted",
+   "verify": "refutation"
+  },
+  {
+   "id": "t10-ply4b102-unbounded",
+   "kind": "固定预算内未知（观察资源消耗）",
+   "group": "ply4b102-u",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "maxPlies": 0,
+   "maxNodes": 1500000,
+   "timeMs": 60000,
+   "expect": "unknown",
+   "verify": "none",
+   "note": "不强求解决；只记录节点/时间/内存",
+   "budgetCapped": true
+  }
+ ],
+ "excluded": {}
+}

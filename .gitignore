@@ -15,6 +15,14 @@ android/.keystore-pass
 # ============ 运行期状态与脚本输出 ============
 tools/drive_state.json
 tools/g4_ai_stats_v3.csv
+# 对局台导出的失败棋谱（可再生：solver-bench --record 重新生成，不入库）
+tools/bench-games-*.jsonl
+# PNS/df-pn 导出的策略树证明（可再生：prove-positions 重新生成，不入库）
+tools/proofs-*.jsonl
+
+# 有界扫深的大证书（22MB 级）：**规范输入与核验结果**在 tools/fixtures/bounded-ply4.json（入库），
+# 完整证书由 node tools/make-bounded-fixtures.js 确定性重生成，故不入库。
+tools/fixtures/bounded-ply4-certs.jsonl
 
 # ============ 日志 ============
 *.log

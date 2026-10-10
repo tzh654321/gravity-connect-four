@@ -1,0 +1,132 @@
+{
+  "label": "bounded-ply4.json  P1 走  （攻击方 P2）",
+  "board": [
+    [
+      "0,0",
+      3
+    ],
+    [
+      "-1,0",
+      1
+    ],
+    [
+      "-1,-1",
+      2
+    ],
+    [
+      "0,1",
+      1
+    ],
+    [
+      "0,-1",
+      2
+    ]
+  ],
+  "side": 1,
+  "horizon": 16,
+  "origin": "after-move",
+  "moves": [
+    {
+      "move": {
+        "x": -1,
+        "y": 1
+      },
+      "heuristicScore": 15,
+      "ownWin": null,
+      "opponentWin": {
+        "horizon": 16,
+        "minPlies": 7,
+        "exact": true
+      },
+      "survival": null
+    },
+    {
+      "move": {
+        "x": -1,
+        "y": -2
+      },
+      "heuristicScore": -1,
+      "ownWin": null,
+      "opponentWin": {
+        "horizon": 16,
+        "minPlies": 7,
+        "exact": true
+      },
+      "survival": null
+    },
+    {
+      "move": {
+        "x": -2,
+        "y": 0
+      },
+      "heuristicScore": -4,
+      "ownWin": null,
+      "opponentWin": {
+        "horizon": 16,
+        "minPlies": 3,
+        "exact": true
+      },
+      "survival": null
+    },
+    {
+      "move": {
+        "x": 1,
+        "y": 0
+      },
+      "heuristicScore": 9,
+      "ownWin": null,
+      "opponentWin": {
+        "horizon": 16,
+        "minPlies": 13,
+        "exact": true
+      },
+      "survival": null
+    },
+    {
+      "move": {
+        "x": 0,
+        "y": -2
+      },
+      "heuristicScore": 0,
+      "ownWin": null,
+      "opponentWin": null,
+      "survival": {
+        "horizon": 16
+      }
+    },
+    {
+      "move": {
+        "x": 1,
+        "y": -1
+      },
+      "heuristicScore": 10,
+      "ownWin": null,
+      "opponentWin": null,
+      "survival": {
+        "horizon": 16
+      }
+    },
+    {
+      "move": {
+        "x": 0,
+        "y": 2
+      },
+      "heuristicScore": 5,
+      "ownWin": null,
+      "opponentWin": {
+        "horizon": 16,
+        "minPlies": null,
+        "exact": false
+      },
+      "survival": null
+    }
+  ],
+  "decision": {
+    "move": {
+      "x": 1,
+      "y": -1
+    },
+    "tier": "survival",
+    "reason": "有防守证书：对手无法在 ≤16 半回合内强制连四（2 个候选都有证书，用受限搜索定序）"
+  }
+}

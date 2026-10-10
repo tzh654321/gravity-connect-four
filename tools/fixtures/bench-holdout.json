@@ -1,0 +1,35 @@
+{
+  "note": "DFPN 走法排序实验的**留出集**（P8-2）。固定时间：2026-10-10，**在实现任何排序之前**固定。用途：只用于判断「是否默认启用排序」，不用于选择排序规则 / 不用于调权重。规则盯第六条：排序规则一旦确定，不因某个留出任务变慢就回头改权重 —— 那时它就不再是留出集了。",
+  "conventions": [
+    "开发集 = tools/fixtures/bench-suite.json（已经用于多轮成本剖析，容易变成调参目标，故不再当作留出集）",
+    "本文件所有任务来自**已有夹具**：① tools/fixtures/bounded-ply4.json 的 7 个根走法中**未被开发集使用**的那 6 个（开发集只用了 (1,-1) 那一组）；② tools/fixtures/proofs-fixtures.jsonl 里 2 个已核验的小夹具。没有为本实验新跑任何对局。",
+    "期望结论全部由**已独立核验的夹具数据**推出，不是由本次搜索给出：minWinDepth=d ⇒ N>=d 应为 proven-win、N<d 应为 refuted；maxRefuted=R ⇒ N<=R 应为 refuted。",
+    "budgetCapped=true 的任务**不断言结论**，只看资源消耗（两个版本都完不成时，不按 pn 大小判优）。",
+    "允许排序后的**证明树不同**（不同见证 / 不同树大小），只要求结论一致 + 证书通过规则层独立核验。"
+  ],
+  "sources": {
+    "ply4": "tools/fixtures/bounded-ply4.json（board + ply4Move 走一步后的局面）",
+    "minWinDepth": { "(1,0)": 13, "(-2,0)": 3, "(-1,1)": 7, "(-1,-2)": 7, "(0,2)": 9 },
+    "maxRefuted(attacker=2)": { "(0,-2)": 16 },
+    "maxRefuted(attacker=1)": { "(0,-2)": 17 }
+  },
+  "tasks": [
+    { "id": "h1-ply4-m-2-0-n3", "kind": "留出：已证胜（最浅）", "group": "m-2-0", "ply4Move": { "x": -2, "y": 0 }, "attacker": 2, "maxPlies": 3, "maxNodes": 400000, "timeMs": 60000, "expect": "proven-win", "verify": "strategy" },
+    { "id": "h2-ply4-m-2-0-n2", "kind": "留出：同一局面的浅反证", "group": "m-2-0", "ply4Move": { "x": -2, "y": 0 }, "attacker": 2, "maxPlies": 2, "maxNodes": 400000, "timeMs": 60000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h3-ply4-m-1-1-n7", "kind": "留出：已证胜", "group": "m-1-1", "ply4Move": { "x": -1, "y": 1 }, "attacker": 2, "maxPlies": 7, "maxNodes": 400000, "timeMs": 60000, "expect": "proven-win", "verify": "strategy" },
+    { "id": "h4-ply4-m-1-1-n6", "kind": "留出：差一层转反证", "group": "m-1-1", "ply4Move": { "x": -1, "y": 1 }, "attacker": 2, "maxPlies": 6, "maxNodes": 400000, "timeMs": 60000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h5-ply4-m-1-m2-n7", "kind": "留出：已证胜", "group": "m-1-m2", "ply4Move": { "x": -1, "y": -2 }, "attacker": 2, "maxPlies": 7, "maxNodes": 400000, "timeMs": 60000, "expect": "proven-win", "verify": "strategy" },
+    { "id": "h6-ply4-m-1-m2-n5", "kind": "留出：差两层转反证", "group": "m-1-m2", "ply4Move": { "x": -1, "y": -2 }, "attacker": 2, "maxPlies": 5, "maxNodes": 400000, "timeMs": 60000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h7-ply4-m0-2-n9", "kind": "留出：已证胜", "group": "m0-2", "ply4Move": { "x": 0, "y": 2 }, "attacker": 2, "maxPlies": 9, "maxNodes": 400000, "timeMs": 60000, "expect": "proven-win", "verify": "strategy" },
+    { "id": "h8-ply4-m0-2-n8", "kind": "留出：差一层转反证", "group": "m0-2", "ply4Move": { "x": 0, "y": 2 }, "attacker": 2, "maxPlies": 8, "maxNodes": 400000, "timeMs": 60000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h9-ply4-m1-0-n13", "kind": "留出：最深的已证胜（实际走过的那一手）", "group": "m1-0", "ply4Move": { "x": 1, "y": 0 }, "attacker": 2, "maxPlies": 13, "maxNodes": 3000000, "timeMs": 300000, "expect": "proven-win", "verify": "strategy" },
+    { "id": "h10-ply4-m0-m2-n10", "kind": "留出：安静局面的有界反证", "group": "m0-m2", "ply4Move": { "x": 0, "y": -2 }, "attacker": 2, "maxPlies": 10, "maxNodes": 2000000, "timeMs": 120000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h11-ply4-m0-m2-n12", "kind": "留出：同一安静局面更深一层", "group": "m0-m2", "ply4Move": { "x": 0, "y": -2 }, "attacker": 2, "maxPlies": 12, "maxNodes": 2000000, "timeMs": 120000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h12-ply4-m0-m2-self-n12", "kind": "留出：换攻击方（走子方自己的视角）", "group": "m0-m2-self", "ply4Move": { "x": 0, "y": -2 }, "attacker": 1, "maxPlies": 12, "maxNodes": 2000000, "timeMs": 120000, "expect": "refuted", "verify": "refutation" },
+    { "id": "h13-ply4-m0-m2-n18-cap", "kind": "留出：节点预算内未知（只看资源）", "group": "m0-m2-cap", "ply4Move": { "x": 0, "y": -2 }, "attacker": 2, "maxPlies": 18, "maxNodes": 200000, "timeMs": 60000, "expect": "unknown", "verify": "none", "budgetCapped": true }
+  ],
+  "excluded": {
+    "reason": "原先用 proofs-fixtures.jsonl 里两个小夹具（h14/h15）做多样性，但它们的 DAG 只过宽松的 verifyDag、过不了**严格策略核验**（verify / verifyStrategy：'OR 节点必须恰好 1 步'）⇒ 由它们推出的 expectation 不可靠。剔除时不看任何排序实验结果（当时还没实现排序），纯粹是期望来源不可信。剔除发生在**实现排序之前**，不属事后调整留出集。",
+    "check": "node -e \"const R=require('./tools/verify-strategy.js'); ...\" 对两个夹具：verifyDag ok / verify 失败"
+  }
+}
