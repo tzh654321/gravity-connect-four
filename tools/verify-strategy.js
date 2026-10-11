@@ -27,56 +27,61 @@ function verify(entries, attacker, tree) {
   const start = R.fromEntries(entries);
   if (R.winner(start)) return { ok: false, reason: '起始局面已终局' };
 
+  /* `stack` 只用来在失败时给出**出错节点路径**（`P侧@x,y` 的序列），便于与快速核验器逐项比对：
+     两者必须给出**同一个**失败原因类别和同一条路径。成功时不含该字段。 */
+  const stack = [];
   const walk = (b, node) => {
     if (failure) return;
-    if (++nodes > 500000) { failure = { ok: false, reason: '策略树过大（>50 万节点）' }; return; }
+    if (++nodes > 500000) { failure = { ok: false, reason: '策略树过大（>50 万节点）', path: stack.slice() }; return; }
     const side = R.sideToMove(b);
     const w = R.winner(b);
     if (node.terminal) {
       const t = node.terminal;
       if (t.kind === 'connect4') {
-        if (w !== attacker) failure = { ok: false, reason: 'connect4 终点不成立' };
+        if (w !== attacker) failure = { ok: false, reason: 'connect4 终点不成立', path: stack.slice() };
         return;
       }
       if (t.kind === 'double-threat') {
         const a = R.winPoints(b, attacker).length, d = R.winPoints(b, 3 - attacker).length;
-        if (!(a >= 2 && d === 0)) failure = { ok: false, reason: `double-threat 终点不成立（胜点 ${a}/${d}）` };
+        if (!(a >= 2 && d === 0)) failure = { ok: false, reason: `double-threat 终点不成立（胜点 ${a}/${d}）`, path: stack.slice() };
         return;
       }
       if (t.kind === 'immediate-win') {
-        if (side !== attacker) { failure = { ok: false, reason: 'immediate-win 终点出现在对手回合' }; return; }
+        if (side !== attacker) { failure = { ok: false, reason: 'immediate-win 终点出现在对手回合', path: stack.slice() }; return; }
         const ok = R.legalMoves(b).some(m => m.x === t.at.x && m.y === t.at.y) &&
           (() => { const nb = R.cloneBoard(b); nb.set(R.K(t.at.x, t.at.y), attacker); return R.line4(nb, t.at.x, t.at.y, attacker); })();
-        if (!ok) failure = { ok: false, reason: 'immediate-win 指向的不是即时胜点' };
+        if (!ok) failure = { ok: false, reason: 'immediate-win 指向的不是即时胜点', path: stack.slice() };
         return;
       }
-      failure = { ok: false, reason: '未知终点类型：' + t.kind };
+      failure = { ok: false, reason: '未知终点类型：' + t.kind, path: stack.slice() };
       return;
     }
-    if (w) { failure = { ok: false, reason: w === attacker ? '已连四却仍在展开' : '该子树里防守方已连四' }; return; }
+    if (w) { failure = { ok: false, reason: w === attacker ? '已连四却仍在展开' : '该子树里防守方已连四', path: stack.slice() }; return; }
     const legal = R.legalMoves(b);
     const moves = node.moves || [];
     if (side === attacker) {
-      if (moves.length !== 1) { failure = { ok: false, reason: 'OR 节点必须恰好 1 步' }; return; }
+      if (moves.length !== 1) { failure = { ok: false, reason: 'OR 节点必须恰好 1 步', path: stack.slice() }; return; }
       const m = moves[0].move;
-      if (!legal.some(q => q.x === m.x && q.y === m.y)) { failure = { ok: false, reason: 'OR 步非法' }; return; }
+      if (!legal.some(q => q.x === m.x && q.y === m.y)) { failure = { ok: false, reason: 'OR 步非法', path: stack.slice() }; return; }
       const nb = R.cloneBoard(b); nb.set(R.K(m.x, m.y), side);
-      walk(nb, moves[0].child);
+      stack.push(`P${side}@${m.x},${m.y}`); walk(nb, moves[0].child); stack.pop();
       return;
     }
     andNodes++;
     if (moves.length !== legal.length) {
-      failure = { ok: false, reason: `AND 节点未覆盖全部应手（记录 ${moves.length} / 合法 ${legal.length}）` };
+      failure = { ok: false, reason: `AND 节点未覆盖全部应手（记录 ${moves.length} / 合法 ${legal.length}）`, path: stack.slice() };
       return;
     }
     const got = new Set(moves.map(e => R.K(e.move.x, e.move.y)));
-    for (const m of legal) if (!got.has(R.K(m.x, m.y))) { failure = { ok: false, reason: `AND 节点缺少应手 ${m.x},${m.y}` }; return; }
-    if (R.winPoints(b, side).length) { failure = { ok: false, reason: '对手本可立即连四（攻击给了对手先赢）' }; return; }
+    for (const m of legal) if (!got.has(R.K(m.x, m.y))) {
+      failure = { ok: false, reason: `AND 节点缺少应手 ${m.x},${m.y}`, path: stack.slice() }; return;
+    }
+    if (R.winPoints(b, side).length) { failure = { ok: false, reason: '对手本可立即连四（攻击给了对手先赢）', path: stack.slice() }; return; }
     for (const e of moves) {
       if (failure) return;
-      if (!legal.some(q => q.x === e.move.x && q.y === e.move.y)) { failure = { ok: false, reason: 'AND 步非法' }; return; }
+      if (!legal.some(q => q.x === e.move.x && q.y === e.move.y)) { failure = { ok: false, reason: 'AND 步非法', path: stack.slice() }; return; }
       const nb = R.cloneBoard(b); nb.set(R.K(e.move.x, e.move.y), side);
-      walk(nb, e.child);
+      stack.push(`P${side}@${e.move.x},${e.move.y}`); walk(nb, e.child); stack.pop();
     }
   };
 
@@ -214,61 +219,67 @@ function verifyRefutation(entries, attacker, ref) {
   if (R.winner(b0)) return { ok: false, reason: '起始局面已终局' };
   let nodes = 0, attackerNodes = 0, leaves = 0, failure = null;
 
+  // 与 verify() 一样：`stack` 只用于失败时给出**出错节点路径**，便于与快速核验器逐项比对。
+  const stack = [];
   const walk = (b, side, rem, node) => {
     if (failure) return;
-    if (++nodes > 500000) { failure = { ok: false, reason: '反证证书过大（>50 万节点）' }; return; }
+    if (++nodes > 500000) { failure = { ok: false, reason: '反证证书过大（>50 万节点）', path: stack.slice() }; return; }
     const expect = R.sideToMove(b);
-    if (side !== expect) { failure = { ok: false, reason: `行棋方不符（应 P${expect}，记 P${side}）` }; return; }
+    if (side !== expect) { failure = { ok: false, reason: `行棋方不符（应 P${expect}，记 P${side}）`, path: stack.slice() }; return; }
     const w = R.winner(b);
-    if (w === attacker) { failure = { ok: false, reason: '证书里出现攻击方已连四（反证不成立）' }; return; }
+    if (w === attacker) { failure = { ok: false, reason: '证书里出现攻击方已连四（反证不成立）', path: stack.slice() }; return; }
     if (node.terminal) {
       leaves++;
       const t = node.terminal;
       if (t.kind === 'depth-limit') {
-        if (w) failure = { ok: false, reason: 'depth-limit 终点却已终局' };
-        else if (rem !== 0) failure = { ok: false, reason: `depth-limit 终点出现在还有 ${rem} 半回合时` };
+        if (w) failure = { ok: false, reason: 'depth-limit 终点却已终局', path: stack.slice() };
+        else if (rem !== 0) failure = { ok: false, reason: `depth-limit 终点出现在还有 ${rem} 半回合时`, path: stack.slice() };
         return;
       }
       if (t.kind === 'connect4' || t.kind === 'defender-win') {
-        if (w !== defender) failure = { ok: false, reason: 'defender 连四终点不成立' };
+        if (w !== defender) failure = { ok: false, reason: 'defender 连四终点不成立', path: stack.slice() };
         return;
       }
       if (t.kind === 'defender-immediate-win') {
-        if (side !== defender || R.winPoints(b, defender).length < 1) failure = { ok: false, reason: 'defender-immediate-win 不成立' };
+        if (side !== defender || R.winPoints(b, defender).length < 1) failure = { ok: false, reason: 'defender-immediate-win 不成立', path: stack.slice() };
         return;
       }
       if (t.kind === 'defender-double-threat') {
         if (side !== attacker || R.winPoints(b, attacker).length !== 0 || R.winPoints(b, defender).length < 2) {
-          failure = { ok: false, reason: 'defender-double-threat 不成立' };
+          failure = { ok: false, reason: 'defender-double-threat 不成立', path: stack.slice() };
         }
         return;
       }
-      failure = { ok: false, reason: '反证证书里出现非法终点：' + t.kind };
+      failure = { ok: false, reason: '反证证书里出现非法终点：' + t.kind, path: stack.slice() };
       return;
     }
-    if (w) { failure = { ok: false, reason: '已终局却仍在展开' }; return; }
-    if (rem <= 0) { failure = { ok: false, reason: '半回合已用尽却不是 depth-limit 终点' }; return; }
+    if (w) { failure = { ok: false, reason: '已终局却仍在展开', path: stack.slice() }; return; }
+    if (rem <= 0) { failure = { ok: false, reason: '半回合已用尽却不是 depth-limit 终点', path: stack.slice() }; return; }
     const legal = R.legalMoves(b);
     const moves = node.moves || [];
     if (side === attacker) {
       attackerNodes++;
       if (moves.length !== legal.length) {
-        failure = { ok: false, reason: `攻击方节点未覆盖全部走法（记录 ${moves.length} / 合法 ${legal.length}）` }; return;
+        failure = { ok: false, reason: `攻击方节点未覆盖全部走法（记录 ${moves.length} / 合法 ${legal.length}）`, path: stack.slice() }; return;
       }
       const got = new Set(moves.map(e => R.K(e.move.x, e.move.y)));
-      for (const m of legal) if (!got.has(R.K(m.x, m.y))) { failure = { ok: false, reason: `攻击方节点缺少走法 ${m.x},${m.y}` }; return; }
+      for (const m of legal) if (!got.has(R.K(m.x, m.y))) {
+        failure = { ok: false, reason: `攻击方节点缺少走法 ${m.x},${m.y}`, path: stack.slice() }; return;
+      }
       for (const e of moves) {
         if (failure) return;
         const nb = R.cloneBoard(b);
-        if (!R.play(nb, e.move, side)) { failure = { ok: false, reason: '攻击方走法非法' }; return; }
-        walk(nb, defender, rem - 1, e.child);
+        if (!R.play(nb, e.move, side)) { failure = { ok: false, reason: '攻击方走法非法', path: stack.slice() }; return; }
+        stack.push(`P${side}@${e.move.x},${e.move.y}`); walk(nb, defender, rem - 1, e.child); stack.pop();
       }
       return;
     }
-    if (moves.length !== 1) { failure = { ok: false, reason: '防守方节点必须恰好 1 步（见证）' }; return; }
+    if (moves.length !== 1) { failure = { ok: false, reason: '防守方节点必须恰好 1 步（见证）', path: stack.slice() }; return; }
     const nb = R.cloneBoard(b);
-    if (!R.play(nb, moves[0].move, side)) { failure = { ok: false, reason: '防守方走法非法' }; return; }
+    if (!R.play(nb, moves[0].move, side)) { failure = { ok: false, reason: '防守方走法非法', path: stack.slice() }; return; }
+    stack.push(`P${side}@${moves[0].move.x},${moves[0].move.y}`);
     walk(nb, attacker, rem - 1, moves[0].child);
+    stack.pop();
   };
 
   walk(b0, R.sideToMove(b0), ref.maxPlies, ref.tree);

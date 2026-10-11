@@ -86,6 +86,10 @@ node tools/check-net-hint.js                              # 回归：联机入�
 | `threat-report.js` | 证明通道的**覆盖度与开销**报告：四臂对照（基线 / 仅 P3 / 仅 P4 / 两者），回答"多证出了什么、代价是什么"；`--random N` 走随机中局采样，`--minPieces` 可只采残局 |
 | `prove-positions.js` | **离线证明引擎**：对关键局面用 PNS 出完整策略树、核验后持久化成 JSONL；`--attacker side\|opponent` |
 | `verify-strategy.js` | **独立实现的**核验器（刻意不复用核心代码）：核策略树 / DAG / P3 连续威胁序列 / **有界反证的防守证书**；同时作为模块导出供其他工具复用 |
+| `verify-strategy-fast.js` | **核验器的实现加速版（不替换上面那份参考实现）**：只改实现方式——一条 DFS 路径共用一块棋盘（落子/撤销）、**增量维护合法落点**（落子只重查 ≤8 个候选格）、连四**只查刚落的那一格**；检查顺序 / 失败原因文本 / 出错节点路径 / 节点计数与参考实现**逐字一致**。CLI：`<file.jsonl>` 用快速实现、`--ref` 用参考实现、`--both` 双跑比对（不一致即退出码 1） |
+| `check-verify-fast.js` | **快速 × 参考的逐项交叉核对**（P9）：A 全夹具（17 条）比较 `ok`/失败原因/出错路径/节点计数；B1/B2 逐节点审计"增量 `avail` === `rules-ref.legalMoves`、增量连四 === `rules-ref.winner`、`sideToMove` 同口径"；B3 胜点集单元一致性（固定种子轨迹 + `limit` 截断）；C **8 项负向对照**（漏 AND 应手 / 改 OR 走法 / 篡改终点 / 篡改攻击方 / 越半回合限制 / `depth-limit` 改成真连四 / 旋转坐标错 / 非法不稳定落点），要求两类核验器**双双拒绝且原因+路径一致**。`--quick` 跳过大证书 |
+| `verify-bench.js` | **核验器性能对照**：每项多遍取中位数，报**总核验时间 / 每节点时间 / 访问节点数 / 峰值内存高水位 / 一致性**；JSON 解析单独列（证明收益不来自它）。配 `node --expose-gc` 可测高水位增量 |
+| `verify-profile.js` | **参考核验器的阶段剖析**：把 `rules-ref` 原语用计时器临时包起来跑真实大证书，给出 `winner` / `play` / `legalMoves` / `cloneBoard` 的占比（**只在剖析时打补丁**，正式代码热路径不被污染） |
 | `inspect-strategy.js` | 打印一棵策略树的形状与统计（节点/AND/深度/覆盖应手数）并顺手核验，便于人工核对证明 |
 | `find-support-fork.js` | 搜夹具局面：支撑激活型双威胁、多步连续强杀、含 AND 节点的 PNS 策略树（只搜**真正轮到该方**的棋框） |
 | `inject-solver.js` | 把 `solver-core.js` 内联进 `index.html` 主脚本（`--check` 校验同步）；内联而非外链，见该文件头说明 |
@@ -107,6 +111,10 @@ node tools/solve-target.js --records tools/bench-games.jsonl --game "hard|P1#7" 
 node tools/bounded-sweep.js --records tools/bench-games.jsonl --game "hard|P1#7" --ply 4 --maxPlies 4,8,12,16
 node tools/make-bounded-fixtures.js                         # 重生成 ply4 证书 + 内建核验（两向）
 node tools/verify-strategy.js tools/fixtures/bounded-ply4-certs.jsonl   # 另一进程、规则层独立核验
+node tools/verify-strategy-fast.js tools/fixtures/bounded-ply4-certs.jsonl --both  # 快速+参考双跑比对
+node tools/check-verify-fast.js                             # 逐项交叉核对 + 增量审计 + 8 项负向对照
+node --expose-gc tools/verify-bench.js --reps 3             # 性能对照（总时间/每节点时间/峰值内存/一致性）
+node tools/verify-profile.js                                # 参考核验器的阶段剖析（时间去哪了）
 node tools/analyze-defence.js                               # 防守证书结构统计（观察，不是证明）
 node tools/certified-choose.js --fixture tools/fixtures/bounded-ply4.json   # 证书驱动选招（证据表 + 决策）
 node tools/cert-follow.js                                   # 跟随机制：整树遍历 + 重建 + 双核验 + 四旋转
