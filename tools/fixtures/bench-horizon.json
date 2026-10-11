@@ -1,0 +1,355 @@
+{
+ "note": "大 horizon 固定基准（P10）。目的**不是**再建一套评测系统，而是把当前瓶颈固定下来，好选出下一项值得优化的搜索成本。规则：不新增搜索算法、不修改排序（默认 order='none'）、未知任务不强行求解。任务总量刻意控制在 10 个。",
+ "ruleVersion": "g4-rules-1",
+ "conventions": {
+  "proposition": "「attacker 能否在 ≤maxPlies 半回合内强制连四」；maxPlies = 0 表示无界命题；半回合 = 一次落子；连四立即获胜，半回合用尽仍未分胜负记和棋",
+  "horizonOrigin": "计数起点一律是**任务根局面**（见每项 horizonOrigin）：rem 从 maxPlies 起，每落一子减 1；根局面本身不计入",
+  "expect": "proven-win / refuted / null(=没有独立先验，不预设结论)",
+  "expectBasis": "**必填**：预期结论是从哪份已独立核验的材料推出的；没有依据就写 null，禁止把旧搜索返回值当真值",
+  "tierCommon": "改动后日常运行：以**固定节点上限**为主，时间/内存只作保险，允许难题返回未知",
+  "tierRelease": "少量关键大任务：较大固定预算，代表性成果用**参考核验器**双核验；不要求每改一行就跑全部",
+  "unknownBudget": "两档**都不放大**未知任务的预算 —— 在「固定预算内未知」这个命题里，预算本身就是命题的一部分；要更大预算的未知局面那是**新任务**，需要单独登记",
+  "boardSource": "拼写 ply4Move 者，根局面 = tools/fixtures/bounded-ply4.json 的 board + P1 落该子；该文件含规范输入与 SHA-256，证书由 make-bounded-fixtures.js 确定性重生成",
+  "canonicalKey": "由 runner 计算并核对（boardCanonKey，只含棋盘的四旋转规范键）；第一次运行用 --pin 写入，之后每次运行必须一致"
+ },
+ "tiers": {
+  "common": {
+   "memMB": 4096,
+   "why": "以固定节点上限为主；时间与内存是**安全阀**（正常运行不该触发），触发即单列、不进可比合计"
+  },
+  "release": {
+   "memMB": 8192,
+   "why": "少量关键大任务；允许更长墙钟"
+  }
+ },
+ "tasks": [
+  {
+   "id": "hz1-win-n9",
+   "group": "proven-win",
+   "purpose": "较深证胜：存在性证明 + 有效攻击搜索（安静手在内的完整展开）",
+   "ply4Move": {
+    "x": 0,
+    "y": 2
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 9,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (0,2)（6 子，轮到 P2）；rem 从 9 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,0:3;0,1:1;0,2:1",
+   "budget": {
+    "common": {
+     "maxNodes": 400000,
+     "timeMs": 30000
+    },
+    "release": {
+     "maxNodes": 2000000,
+     "timeMs": 120000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）；不跨任务共享",
+   "expect": "proven-win",
+   "expectBasis": "bounded-ply4.json → moves[(0,2)].result = proven-win-within-N，minWinDepth = 9，winTree 172 节点 verified=true；已由规则层独立核验（certs #4）",
+   "verify": "auto"
+  },
+  {
+   "id": "hz2-win-n13",
+   "group": "proven-win",
+   "purpose": "最深已知证胜：13 半回合（该局面的最小强制胜深度就是 13，属紧任务）",
+   "ply4Move": {
+    "x": 1,
+    "y": 0
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 13,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (1,0)（6 子，轮到 P2）；rem 从 13 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,0:3;0,1:1;1,0:1",
+   "budget": {
+    "common": {
+     "maxNodes": 1500000,
+     "timeMs": 90000
+    },
+    "release": {
+     "maxNodes": 8000000,
+     "timeMs": 300000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": "proven-win",
+   "expectBasis": "bounded-ply4.json → moves[(1,0)].result = proven-win-within-N，minWinDepth = 13，winTree 210 节点 verified=true；已由规则层独立核验（certs #0）",
+   "verify": "auto"
+  },
+  {
+   "id": "hz3-refute-n16-a",
+   "group": "refuted",
+   "purpose": "较深有界反证：排除大量攻击分支（本组最贵的两个任务之一）",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 16,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (1,-1)（6 子，轮到 P2）；rem 从 16 起递减",
+   "canonicalKey": "-1,-1:1;-1,0:2;-1,1:2;0,0:3;0,1:1;1,0:1",
+   "budget": {
+    "common": {
+     "maxNodes": 1000000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 6000000,
+     "timeMs": 300000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": "refuted",
+   "expectBasis": "bounded-ply4.json → moves[(1,-1)].result = refuted-up-to-N，maxRefuted = 16，defence 76 405 节点 verified=true；已由规则层独立核验（certs #5）。口径：确切地「无法在 ≤16 半回合内强制连四」，**不是**「永远赢不了」",
+   "verify": "auto"
+  },
+  {
+   "id": "hz4-refute-n16-b",
+   "group": "refuted",
+   "purpose": "较深有界反证：最大的一个（防守证书 169 813 节点）",
+   "ply4Move": {
+    "x": 0,
+    "y": -2
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 16,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (0,-2)（6 子，轮到 P2）；rem 从 16 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,-2:1;0,0:3;0,1:1",
+   "budget": {
+    "common": {
+     "maxNodes": 1000000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 8000000,
+     "timeMs": 600000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": "refuted",
+   "expectBasis": "bounded-ply4.json → moves[(0,-2)].result = refuted-up-to-N，maxRefuted = 16，defence 169 813 节点 verified=true；已由规则层独立核验（certs #6）",
+   "verify": "auto"
+  },
+  {
+   "id": "hz5-pair-n12",
+   "group": "horizon-pair-b102",
+   "purpose": "相邻 horizon 对（下）：与 hz6 同局面同攻击方，只差 horizon；**分别计数，不假定成本单调**",
+   "ply4Move": {
+    "x": 0,
+    "y": -2
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 12,
+   "horizonOrigin": "同 hz4 的根局面；rem 从 12 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,-2:1;0,0:3;0,1:1",
+   "budget": {
+    "common": {
+     "maxNodes": 400000,
+     "timeMs": 30000
+    },
+    "release": {
+     "maxNodes": 2000000,
+     "timeMs": 120000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）；与 hz6 同组但**不共享**缓存（共享复用是另一件事，见 bench-suite 冷/热对照）",
+   "expect": "refuted",
+   "expectBasis": "由**已独立核验的 N=16 防守证书**向下封闭推得：≤16 内赢不了 ⇒ ≤12 内也赢不了（该命题对 N 单调向下）",
+   "verify": "auto"
+  },
+  {
+   "id": "hz6-pair-n14",
+   "group": "horizon-pair-b102",
+   "purpose": "相邻 horizon 对（上）：与 hz5 相差 2 个半回合",
+   "ply4Move": {
+    "x": 0,
+    "y": -2
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 14,
+   "horizonOrigin": "同 hz4 的根局面；rem 从 14 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,-2:1;0,0:3;0,1:1",
+   "budget": {
+    "common": {
+     "maxNodes": 700000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 4000000,
+     "timeMs": 240000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": "refuted",
+   "expectBasis": "同 hz5：由已独立核验的 N=16 防守证书向下封闭推得",
+   "verify": "auto"
+  },
+  {
+   "id": "hz7-refute-me-n17",
+   "group": "refuted",
+   "purpose": "较深有界反证（**攻击方不是行棋方**的一侧）：根是 AND 节点，另一条成本路径",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 1,
+   "sideToMove": 2,
+   "maxPlies": 17,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (1,-1)（6 子，轮到 P2，但攻击方记为 P1）；rem 从 17 起递减",
+   "canonicalKey": "-1,-1:1;-1,0:2;-1,1:2;0,0:3;0,1:1;1,0:1",
+   "budget": {
+    "common": {
+     "maxNodes": 400000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 2000000,
+     "timeMs": 180000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": "refuted",
+   "expectBasis": "bounded-ply4.json → moves[(1,-1)].self.result = refuted-up-to-N，maxRefuted = 19，defence 12 048 节点 verified=true；已由规则层独立核验（certs #7 为 N=19、#8 为 N=17）",
+   "verify": "auto"
+  },
+  {
+   "id": "hz8-unknown-unbounded",
+   "group": "unknown",
+   "purpose": "固定预算内未知（无界口径）：保留实际难题，防止只优化容易任务；**不按 pn 大小判优**",
+   "ply4Move": {
+    "x": 1,
+    "y": -1
+   },
+   "attacker": 2,
+   "sideToMove": 2,
+   "maxPlies": 0,
+   "horizonOrigin": "无界命题 ⇒ 没有 horizon；预算本身就是命题的一部分",
+   "canonicalKey": "-1,-1:1;-1,0:2;-1,1:2;0,0:3;0,1:1;1,0:1",
+   "budget": {
+    "common": {
+     "maxNodes": 1500000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 1500000,
+     "timeMs": 60000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": null,
+   "expectBasis": null,
+   "note": "无独立先验。已知「在这些算法/实现/预算下尚未解决」（fixtures/bench-suite.json t10 同局面同命题返回 unknown）——**未解决 ≠ 不可解**，故不预设结论",
+   "verify": "none",
+   "budgetCapped": true
+  },
+  {
+   "id": "hz9-unknown-n18",
+   "group": "unknown",
+   "purpose": "预算内未知（有界、很深）：把已知的「难到解不出」固定下来，看资源消耗与是否误导优化方向",
+   "ply4Move": {
+    "x": 0,
+    "y": -2
+   },
+   "attacker": 1,
+   "sideToMove": 2,
+   "maxPlies": 18,
+   "horizonOrigin": "根局面 = ply4 棋盘 + P1 落 (0,-2)（6 子，轮到 P2，攻击方记为 P1）；rem 从 18 起递减",
+   "canonicalKey": "-1,-1:2;-1,0:1;0,-1:2;0,-2:1;0,0:3;0,1:1",
+   "budget": {
+    "common": {
+     "maxNodes": 2000000,
+     "timeMs": 120000
+    },
+    "release": {
+     "maxNodes": 2000000,
+     "timeMs": 120000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": null,
+   "expectBasis": null,
+   "note": "无独立先验。bounded-ply4.json → moves[(0,-2)].self.unknownAt = [18,19]：该侧的扫深在 N=18/19 处**未解决**（不是不可解）。本任务预算**故意固定为不足**（两档都不放大的理由见 conventions.unknownBudget），**不要求解出**，也**不花十几分钟**；只登记资源消耗",
+   "verify": "none",
+   "budgetCapped": true
+  },
+  {
+   "id": "hz10-other-ply10",
+   "group": "other-source",
+   "purpose": "不同来源局面：检查结论/成本是否依赖 ply4 家族",
+   "board": [
+    [
+     "0,0",
+     3
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "1,1",
+     2
+    ],
+    [
+     "1,2",
+     1
+    ],
+    [
+     "0,-2",
+     2
+    ]
+   ],
+   "attacker": 2,
+   "sideToMove": 1,
+   "maxPlies": 9,
+   "horizonOrigin": "根局面 = 该棋盘本身（11 子含中立子，轮到 P1，攻击方记为 P2）；rem 从 9 起递减",
+   "canonicalKey": "-1,-1:1;-1,-2:2;-1,0:1;-2,0:1;0,-1:1;0,-2:2;0,0:3;1,-1:2;1,0:2;1,1:2;1,2:1",
+   "source": "tools/fixtures/bench-other-games.json 的 g01-hardP1#2-ply10（源自 tools/bench-games-v2.jsonl，**不是** ply4 来源局 hard|P1#7）",
+   "budget": {
+    "common": {
+     "maxNodes": 1000000,
+     "timeMs": 60000
+    },
+    "release": {
+     "maxNodes": 2000000,
+     "timeMs": 120000
+    }
+   },
+   "cache": "每任务全新 boundCache（冷）",
+   "expect": null,
+   "expectBasis": null,
+   "note": "无独立先验（该局面没有已核验的判定数据）⇒ expect=null；正确性判据只有「结论与运行方式一致 + 若产出证书则过双层核验」",
+   "verify": "auto"
+  }
+ ]
+}
