@@ -348,9 +348,16 @@ const P1 = 1, P2 = 2, BLOCK = 3;
 (function (root) {
   const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
   const CROSS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  /* 模块级常量：`for (const sign of [-1, 1])` 会在**每次调用**分配一个临时数组，
+     而 `line()` 是最热的循环之一 ⇒ 提到模块级（只读）。 */
+  const SIGNS = [-1, 1];
   const WEIGHT = [0, 2, 18, 180];
-  const key = (x, y) => `${x},${y}`;
-  const point = k => { const [x, y] = k.split(',').map(Number); return { x, y }; };
+  /* `key` = 位置表示的唯一格式（对外 API、证书、规则层都用它）。字符串拼接与模板字面量
+     产生**逐字相同**的字符串，选前者只是因为它在热路径上少一层转换。 */
+  const key = (x, y) => x + ',' + y;
+  /* ⚠ 只接受**规范键**（构造器已断言 `key(x,y) === k`）。
+     原写法 `k.split(',').map(Number)` 每次调用分配 2 个临时数组；改成 indexOf + slice。 */
+  const point = k => { const i = k.indexOf(','); return { x: +k.slice(0, i), y: +k.slice(i + 1) }; };
   const MATE = 1000000;
   const DEFAULT_FORK_SCAN = 16;   // 双威胁候选预筛上限（仅"找必胜手"，不删搜索宽度）
   const STOP = Symbol('搜索预算耗尽');
@@ -396,19 +403,32 @@ const P1 = 1, P2 = 2, BLOCK = 3;
       return !!this.at(p.x + dx, p.y + dy);
     }
     addNeighbors(p, added) {
-      for (const [dx, dy] of CROSS) {
-        const q = { x: p.x + dx, y: p.y + dy }, k = key(q.x, q.y);
-        if (!this.board.has(k) && this.supported(q) && !this.frontier.has(k)) {
-          this.frontier.add(k);
-          if (added) added.push(k);
-        }
+      /* 热路径：原来每个邻居都 `{x,y}` 建一个对象再交给 `supported()`（内部还要再拼一次键）。
+         这里就地算，少一次对象分配；判定与原来完全等价（`supported` 就是"下方那一格有子"）。 */
+      for (let i = 0; i < CROSS.length; i++) {
+        const qx = p.x + CROSS[i][0], qy = p.y + CROSS[i][1], k = key(qx, qy);
+        if (this.board.has(k)) continue;
+        const g = gravity(qx, qy);
+        if (!this.at(qx + g[0], qy + g[1])) continue;
+        if (this.frontier.has(k)) continue;
+        this.frontier.add(k);
+        if (added) added.push(k);
       }
     }
-    moves() { return [...this.frontier].map(point); }
+    /* 热路径：原来先摊开成字符串数组再 map 一遍（两次分配）⇒ 改成单趟 push。
+       返回的 `{x,y}` 与**顺序**都与原来一致（`frontier` 是 Set ⇒ 插入序）。 */
+    moves() {
+      const out = [];
+      for (const k of this.frontier) out.push(point(k));
+      return out;
+    }
     line(p, side) {
-      for (const [dx, dy] of DIRS) {
+      // 索引循环 + 模块级 `SIGNS`：判定顺序与 `for (const sign of [-1,1])` 完全一致
+      for (let di = 0; di < DIRS.length; di++) {
+        const dx = DIRS[di][0], dy = DIRS[di][1];
         let n = 1;
-        for (const sign of [-1, 1]) {
+        for (let si = 0; si < SIGNS.length; si++) {
+          const sign = SIGNS[si];
           for (let t = 1; t < 4; t++) {
             if (this.at(p.x + sign * t * dx, p.y + sign * t * dy) !== side) break;
             n++;
@@ -517,8 +537,14 @@ const P1 = 1, P2 = 2, BLOCK = 3;
       return { key: side + '|' + best, rot: bestRot };
     }
     signature(side, rotate) {
-      if (!rotate) return side + '|' + [...this.board].map(([k, o]) => `${k}:${o}`).sort().join(';');
-      return this.canonical(side).key;
+      if (rotate) return this.canonical(side).key;
+      /* 热路径（每次访问一次）：原写法 `[...this.board].map(([k,o]) => \`${k}:${o}\`)`
+         会先为每个条目分配一个 `[k,o]` 二元数组，再分配一个字符串数组 ⇒ 改成单趟 push。
+         **TT 键逐字不变**：同样是"每个条目 `k:o`、默认字典序 sort、`;` 连接、`side|` 前缀"。 */
+      const a = [];
+      for (const [k, o] of this.board) a.push(k + ':' + o);
+      a.sort();
+      return side + '|' + a.join(';');
     }
   }
 

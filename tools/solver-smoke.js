@@ -11,6 +11,21 @@ const G = loadGame(null, 'settleDiscrete,settleExact,quietNega,QFW,P1,P2,state,s
 const sorted = pos => [...pos.frontier].sort();
 const initial = new Position();
 assert.deepEqual(sorted(initial), ['-1,0', '0,-1', '0,1', '1,0']);
+
+/* 位置表示的**格式**是 TT 键 / 证书键 / 状态键的共同基础 ⇒ 这里独立写一遍期望值把它钉住。
+   背景：热路径优化（消掉临时分配）会重写 `key` / `point` / `signature` 的实现，
+   这类改动必须**逐字**保持格式，否则 TT 会分裂成两套键、搜索结论静默漂移。 */
+{
+  const b = [['0,0', 3], ['0,1', 1], ['0,-1', 2], ['-1,0', 1], ['1,0', 2], ['-1,-1', 2], ['0,2', 1]];
+  const p = new Position(b);
+  const body = b.map(([k, o]) => `${k}:${o}`).sort().join(';');
+  assert.equal(p.signature(1), '1|' + body, 'signature 必须是 `side|` + 每格 `k:o` + 字典序 + `;` 连接');
+  assert.equal(p.signature(2), '2|' + body);
+  assert.equal(p.signature(1, true), p.canonical(1).key, 'rotate=true 必须回到 canonical');
+  // `point`（内部）是 `key` 的逆；`moves()` 正是它的出口 ⇒ 用它间接钉住坐标解析（含负坐标）
+  assert.deepEqual(p.moves().map(q => `${q.x},${q.y}`).sort(), [...p.frontier].sort(),
+    'moves() 的坐标解析必须与 frontier 的键逐字互为逆');
+}
 const before = initial.signature(1), f = sorted(initial);
 const undo = initial.play({ x: 1, y: 0 }, 1);
 assert(initial.frontier.has('1,1'));
