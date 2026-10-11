@@ -384,6 +384,49 @@ head('E 顺序不变（frontier 插入序 = moves() 顺序 = Set 插入序）');
 }
 
 /* ============================================================
+   G 后端切换的"零索引开销"断言
+   —— 回答"`string` 模式会不会又建索引、又只用字符串查询"这个问题。
+   结论写成断言，避免以后改动把回退路径变成"看得见的净成本"。
+   ⚠ 同时记清口径：`string` 模式**不是**旧提交的逐字节等价物
+     （`addNeighbors` 在两个模式下都推迟拼 `key()`），所以它只用于**等价性**对照；
+     **成本对照必须用旧提交的构建**（`git show 9f4ea65:tools/solver-core.js`）。
+   ============================================================ */
+head('G 后端切换的开销断言');
+{
+  const pos = new CORE.Position(PLY4.board);
+  if (!COLS) {
+    if (pos.cols !== null) fail(`G string 模式下构造出的 cols 不为 null（${pos.cols}）⇒ 白建索引`);
+    else ok('G：string 模式下构造 Position 不分配 cols（null）');
+    let side = 1;
+    for (let i = 0; i < 40; i++) {
+      const ms = pos.moves();
+      if (!ms.length) break;
+      pos.play(ms[i % ms.length], side); side = 3 - side;
+    }
+    if (pos.cols !== null) fail('G string 模式下 play 之后 cols 不为 null');
+    else ok('G：string 模式下 40 次 play 之后 cols 仍为 null（不构建、不维护）');
+    const src = CORE.Position.prototype._idxSet.toString();
+    if (/cols\s*\.\s*(get|set)/.test(src)) fail(`G string 模式的 _idxSet 仍在写 cols：${src}`);
+    else ok('G：string 模式下 _idxSet/_idxDel 是纯空函数（源码为 ' + src.replace(/\s+/g, ' ') + '）');
+    const mk = CORE.AT_BACKEND;
+    if (mk !== 'string') fail('G AT_BACKEND 读取异常');
+    else ok('G：AT_BACKEND 可读，值为 "string"');
+  } else {
+    if (!(pos.cols instanceof Map) || pos.cols.size < 1) fail('G cols 模式下构造 Position 没有建索引');
+    else ok(`G：cols 模式下构造 Position 建了索引（${pos.cols.size} 列）`);
+    const u = pos.play(pos.moves()[0], 1);
+    const after = pos.cols.size;
+    if (!(after >= 1)) fail('G play 之后索引为空');
+    else ok('G：play 之后索引仍与 board 同步（见 A/B 段的全量重推导）');
+    pos.undo(u);
+    if (CORE.AT_BACKEND !== 'cols') fail('G AT_BACKEND 读取异常');
+    else ok('G：AT_BACKEND 可读，值为 "cols"（默认）');
+  }
+  console.log('      ⚠ 口径：`string` 模式只是"新代码 + 旧查询"，不是旧提交的逐字节等价物');
+  console.log('        （两个模式下 `addNeighbors` 都推迟拼 `key()`）⇒ 等价性对照可用它，**成本对照必须用旧提交**。');
+}
+
+/* ============================================================
    F DIGEST：固定工作量的逐字摘要，供两种后端跨进程比对
    ============================================================ */
 head('F DIGEST（把这段输出在两种后端下各跑一次并 diff）');

@@ -44,3 +44,6 @@ qc
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# 同进程 A/B 的"改动前"副本（ab-core/bench-live 用；用完留着，不进库）
+tools/tmp-*.js

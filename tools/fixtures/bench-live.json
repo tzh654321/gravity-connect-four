@@ -1,0 +1,1505 @@
+{
+ "ruleVersion": "g4-rules-1",
+ "builtAt": "2026-10-11T10:12:23.534Z",
+ "note": "实时（chooseMove）验收局面集。棋盘显式写出，不依赖未入库的棋谱文件。类别只按覆盖配额挑、每类每局最多 2 项，不按\"跑得好看\"挑；`immediateTactic` 与 `certHit` 为真的局面在计时统计里必须单列/排除。",
+ "source": "tools/bench-games-v2.jsonl + bench-games-lean.jsonl（15 局自博弈；**全部是求解器侧败局**）",
+ "corpusFact": "15 局全部 loss；求解器侧 195 手中 0 次存在即时胜点，对手侧 204 手中有 15 个即时胜点、38 个必胜手 ⇒ 战术类样本只能取对手轮次（同一 AI 也会面对，只是这批棋谱里它恰在另一侧）。",
+ "featureBudgetMs": 500,
+ "tasks": [
+  {
+   "id": "01-cert-hit",
+   "category": "cert-hit",
+   "categoryWhy": "命中单点证书库的根局面（页面会**跳过搜索**，只作对照/说明用）",
+   "game": "hard|P1#7",
+   "file": "bench-games-lean.jsonl",
+   "ply": 4,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     1
+    ]
+   ],
+   "legalAtSelection": 7,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": true,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 5,
+    "move": "1,0",
+    "nodesAt500ms": 4220
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 5,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "02-immediate-tactic",
+   "category": "immediate-tactic",
+   "categoryWhy": "即时战术就返回（近零耗时，计时统计必须单列）",
+   "game": "hard|P1#9",
+   "file": "bench-games-v2.jsonl",
+   "ply": 14,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     1
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,-2",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "1,1",
+     2
+    ],
+    [
+     "1,2",
+     1
+    ],
+    [
+     "2,0",
+     2
+    ],
+    [
+     "3,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 11,
+   "immediateTactic": true,
+   "tacticKind": "double-threat-loss",
+   "ownWinPoints": 0,
+   "oppWinPoints": 2,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": null,
+    "status": "proven-loss",
+    "completedDepth": 0,
+    "move": "-2,-1",
+    "nodesAt500ms": 0
+   },
+   "recorded": {
+    "status": "proven-loss",
+    "proofDepth": 0,
+    "completedDepth": 0,
+    "ms": 0,
+    "exhausted": false
+   }
+  },
+  {
+   "id": "03-immediate-tactic",
+   "category": "immediate-tactic",
+   "categoryWhy": "即时战术就返回（近零耗时，计时统计必须单列）",
+   "game": "hard|P2#12",
+   "file": "bench-games-v2.jsonl",
+   "ply": 21,
+   "side": 2,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     1
+    ],
+    [
+     "-1,-4",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,-1",
+     1
+    ],
+    [
+     "-2,0",
+     2
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,-2",
+     1
+    ],
+    [
+     "0,-3",
+     1
+    ],
+    [
+     "0,-4",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,-3",
+     1
+    ],
+    [
+     "1,0",
+     1
+    ],
+    [
+     "2,-1",
+     1
+    ],
+    [
+     "2,-2",
+     1
+    ],
+    [
+     "2,-3",
+     2
+    ],
+    [
+     "2,0",
+     2
+    ],
+    [
+     "3,-2",
+     2
+    ],
+    [
+     "3,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 13,
+   "immediateTactic": true,
+   "tacticKind": "double-threat-loss",
+   "ownWinPoints": 0,
+   "oppWinPoints": 3,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": null,
+    "status": "proven-loss",
+    "completedDepth": 0,
+    "move": "3,-1",
+    "nodesAt500ms": 0
+   },
+   "recorded": {
+    "status": "proven-loss",
+    "proofDepth": 0,
+    "completedDepth": 0,
+    "ms": 1,
+    "exhausted": false
+   }
+  },
+  {
+   "id": "04-open-quiet",
+   "category": "open-quiet",
+   "categoryWhy": "开局/安静局面（≤3 手、无战术、P3 不命中）",
+   "game": "hard|P1#16",
+   "file": "bench-games-v2.jsonl",
+   "ply": 0,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "0,0",
+     3
+    ]
+   ],
+   "legalAtSelection": 4,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 6,
+    "move": "-1,0",
+    "nodesAt500ms": 3005
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 6,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "05-open-quiet",
+   "category": "open-quiet",
+   "categoryWhy": "开局/安静局面（≤3 手、无战术、P3 不命中）",
+   "game": "hard|P1#18",
+   "file": "bench-games-v2.jsonl",
+   "ply": 0,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "0,0",
+     3
+    ]
+   ],
+   "legalAtSelection": 4,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 6,
+    "move": "-1,0",
+    "nodesAt500ms": 3881
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 6,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "06-open-quiet",
+   "category": "open-quiet",
+   "categoryWhy": "开局/安静局面（≤3 手、无战术、P3 不命中）",
+   "game": "hard|P1#19",
+   "file": "bench-games-v2.jsonl",
+   "ply": 0,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "0,0",
+     3
+    ]
+   ],
+   "legalAtSelection": 4,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 7,
+    "move": "-1,0",
+    "nodesAt500ms": 4408
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 6,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "07-p3-hit",
+   "category": "p3-hit",
+   "categoryWhy": "P3（连续强制威胁）命中",
+   "game": "hard|P1#2",
+   "file": "bench-games-v2.jsonl",
+   "ply": 7,
+   "side": 2,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 8,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "1,1",
+    "nodesAt500ms": 12
+   },
+   "recorded": null
+  },
+  {
+   "id": "08-p3-hit",
+   "category": "p3-hit",
+   "categoryWhy": "P3（连续强制威胁）命中",
+   "game": "hard|P1#9",
+   "file": "bench-games-v2.jsonl",
+   "ply": 7,
+   "side": 2,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 8,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "1,1",
+    "nodesAt500ms": 12
+   },
+   "recorded": null
+  },
+  {
+   "id": "09-plain-fork",
+   "category": "plain-fork",
+   "categoryWhy": "必胜手（造双威胁，胜点都在落子四邻）",
+   "game": "hard|P1#16",
+   "file": "bench-games-v2.jsonl",
+   "ply": 13,
+   "side": 2,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     1
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,-2",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "1,1",
+     2
+    ],
+    [
+     "1,2",
+     1
+    ],
+    [
+     "2,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 10,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [
+    {
+     "move": "3,0",
+     "wins": [
+      "4,0",
+      "3,1"
+     ],
+     "supportActivated": false
+    }
+   ],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "3,0",
+    "nodesAt500ms": 2
+   },
+   "recorded": null
+  },
+  {
+   "id": "10-plain-fork",
+   "category": "plain-fork",
+   "categoryWhy": "必胜手（造双威胁，胜点都在落子四邻）",
+   "game": "hard|P1#18",
+   "file": "bench-games-v2.jsonl",
+   "ply": 13,
+   "side": 2,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     1
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,-2",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "1,1",
+     2
+    ],
+    [
+     "1,2",
+     1
+    ],
+    [
+     "2,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 10,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [
+    {
+     "move": "3,0",
+     "wins": [
+      "4,0",
+      "3,1"
+     ],
+     "supportActivated": false
+    }
+   ],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "3,0",
+    "nodesAt500ms": 2
+   },
+   "recorded": null
+  },
+  {
+   "id": "11-quiet-mid",
+   "category": "quiet-mid",
+   "categoryWhy": "安静中局（≥6 手、无战术、P3 不命中、落点不多）",
+   "game": "hard|P1#19",
+   "file": "bench-games-v2.jsonl",
+   "ply": 6,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 7,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 6,
+    "move": "2,0",
+    "nodesAt500ms": 4550
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 2,
+    "completedDepth": 5,
+    "ms": 801,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "12-quiet-mid",
+   "category": "quiet-mid",
+   "categoryWhy": "安静中局（≥6 手、无战术、P3 不命中、落点不多）",
+   "game": "hard|P1#2",
+   "file": "bench-games-v2.jsonl",
+   "ply": 6,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 7,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 6,
+    "move": "2,0",
+    "nodesAt500ms": 4501
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 5,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "13-single-threat",
+   "category": "single-threat",
+   "categoryWhy": "单杀强制防守（对手恰 1 个即时胜点，必须挡）",
+   "game": "hard|P1#7",
+   "file": "bench-games-lean.jsonl",
+   "ply": 6,
+   "side": 1,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     1
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,0",
+     1
+    ]
+   ],
+   "legalAtSelection": 8,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 1,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 8,
+    "move": "2,-1",
+    "nodesAt500ms": 4772
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 4,
+    "completedDepth": 7,
+    "ms": 800,
+    "exhausted": true
+   }
+  },
+  {
+   "id": "14-single-threat",
+   "category": "single-threat",
+   "categoryWhy": "单杀强制防守（对手恰 1 个即时胜点，必须挡）",
+   "game": "hard|P2#15",
+   "file": "bench-games-v2.jsonl",
+   "ply": 6,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     2
+    ],
+    [
+     "0,2",
+     1
+    ],
+    [
+     "1,0",
+     1
+    ],
+    [
+     "1,1",
+     2
+    ],
+    [
+     "1,2",
+     1
+    ]
+   ],
+   "legalAtSelection": 7,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 1,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 8,
+    "move": "-2,1",
+    "nodesAt500ms": 4760
+   },
+   "recorded": null
+  },
+  {
+   "id": "15-single-threat",
+   "category": "single-threat",
+   "categoryWhy": "单杀强制防守（对手恰 1 个即时胜点，必须挡）",
+   "game": "hard|P2#17",
+   "file": "bench-games-lean.jsonl",
+   "ply": 6,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,-2",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ]
+   ],
+   "legalAtSelection": 7,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 1,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 7,
+    "move": "-1,-4",
+    "nodesAt500ms": 4181
+   },
+   "recorded": null
+  },
+  {
+   "id": "16-support-fork",
+   "category": "support-fork",
+   "categoryWhy": "支撑激活战术（存在必胜手，且胜点不全在落子四邻 ⇒ 靠新支撑激活）",
+   "game": "hard|P2#12",
+   "file": "bench-games-v2.jsonl",
+   "ply": 20,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,-3",
+     1
+    ],
+    [
+     "-1,-4",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,-1",
+     1
+    ],
+    [
+     "-2,0",
+     2
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,-2",
+     1
+    ],
+    [
+     "0,-3",
+     1
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     2
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,-3",
+     1
+    ],
+    [
+     "1,0",
+     1
+    ],
+    [
+     "2,-1",
+     1
+    ],
+    [
+     "2,-2",
+     1
+    ],
+    [
+     "2,-3",
+     2
+    ],
+    [
+     "2,0",
+     2
+    ],
+    [
+     "3,-2",
+     2
+    ],
+    [
+     "3,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 12,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [
+    {
+     "move": "0,-4",
+     "wins": [
+      "-1,-5",
+      "3,-1",
+      "0,-5"
+     ],
+     "supportActivated": true
+    },
+    {
+     "move": "3,-1",
+     "wins": [
+      "4,0",
+      "0,-4"
+     ],
+     "supportActivated": true
+    }
+   ],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "-2,-2",
+    "nodesAt500ms": 4
+   },
+   "recorded": null
+  },
+  {
+   "id": "17-support-fork",
+   "category": "support-fork",
+   "categoryWhy": "支撑激活战术（存在必胜手，且胜点不全在落子四邻 ⇒ 靠新支撑激活）",
+   "game": "hard|P2#19",
+   "file": "bench-games-lean.jsonl",
+   "ply": 22,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-1,1",
+     2
+    ],
+    [
+     "-2,-1",
+     2
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "-2,1",
+     2
+    ],
+    [
+     "-3,-1",
+     2
+    ],
+    [
+     "-3,-2",
+     1
+    ],
+    [
+     "-3,0",
+     2
+    ],
+    [
+     "-3,1",
+     2
+    ],
+    [
+     "-4,0",
+     2
+    ],
+    [
+     "-4,1",
+     1
+    ],
+    [
+     "0,-1",
+     1
+    ],
+    [
+     "0,-2",
+     1
+    ],
+    [
+     "0,-3",
+     1
+    ],
+    [
+     "0,-4",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     1
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "1,-2",
+     1
+    ],
+    [
+     "1,-3",
+     2
+    ],
+    [
+     "2,-1",
+     2
+    ],
+    [
+     "2,-3",
+     2
+    ]
+   ],
+   "legalAtSelection": 13,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [
+    {
+     "move": "-1,-2",
+     "wins": [
+      "-2,-2",
+      "2,-2",
+      "-1,-3"
+     ],
+     "supportActivated": true
+    },
+    {
+     "move": "2,-2",
+     "wins": [
+      "-1,-2",
+      "3,-2"
+     ],
+     "supportActivated": true
+    }
+   ],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "-1,-2",
+    "nodesAt500ms": 2
+   },
+   "recorded": null
+  },
+  {
+   "id": "18-support-fork",
+   "category": "support-fork",
+   "categoryWhy": "支撑激活战术（存在必胜手，且胜点不全在落子四邻 ⇒ 靠新支撑激活）",
+   "game": "hard|P2#8",
+   "file": "bench-games-lean.jsonl",
+   "ply": 20,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     1
+    ],
+    [
+     "-1,-2",
+     2
+    ],
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-1,1",
+     2
+    ],
+    [
+     "-2,-1",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "-3,-1",
+     1
+    ],
+    [
+     "-3,-2",
+     1
+    ],
+    [
+     "-3,-3",
+     2
+    ],
+    [
+     "-3,0",
+     1
+    ],
+    [
+     "-4,-1",
+     2
+    ],
+    [
+     "-4,0",
+     2
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     2
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "2,0",
+     2
+    ],
+    [
+     "2,1",
+     1
+    ],
+    [
+     "3,0",
+     2
+    ],
+    [
+     "4,0",
+     1
+    ]
+   ],
+   "legalAtSelection": 14,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 0,
+   "forkMoves": [
+    {
+     "move": "-2,1",
+     "wins": [
+      "-2,-2",
+      "-3,1"
+     ],
+     "supportActivated": true
+    }
+   ],
+   "certHit": false,
+   "expect": {
+    "p3": "proven-win",
+    "status": "proven-win",
+    "completedDepth": 0,
+    "move": "-2,1",
+    "nodesAt500ms": 3
+   },
+   "recorded": null
+  },
+  {
+   "id": "19-wide-mid",
+   "category": "wide-mid",
+   "categoryWhy": "合法落点较多的中局（≥10）",
+   "game": "hard|P2#20",
+   "file": "bench-games-lean.jsonl",
+   "ply": 10,
+   "side": 1,
+   "sideRole": "opponent",
+   "board": [
+    [
+     "-1,-1",
+     2
+    ],
+    [
+     "-1,-2",
+     1
+    ],
+    [
+     "-1,0",
+     2
+    ],
+    [
+     "-1,2",
+     1
+    ],
+    [
+     "-2,0",
+     2
+    ],
+    [
+     "-3,0",
+     2
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "0,1",
+     1
+    ],
+    [
+     "0,2",
+     1
+    ],
+    [
+     "1,-1",
+     1
+    ]
+   ],
+   "legalAtSelection": 10,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 1,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 5,
+    "move": "-4,0",
+    "nodesAt500ms": 3185
+   },
+   "recorded": null
+  },
+  {
+   "id": "20-wide-mid",
+   "category": "wide-mid",
+   "categoryWhy": "合法落点较多的中局（≥10）",
+   "game": "hard|P2#8",
+   "file": "bench-games-lean.jsonl",
+   "ply": 7,
+   "side": 2,
+   "sideRole": "solver",
+   "board": [
+    [
+     "-1,0",
+     1
+    ],
+    [
+     "-2,0",
+     1
+    ],
+    [
+     "-3,0",
+     1
+    ],
+    [
+     "0,-1",
+     2
+    ],
+    [
+     "0,0",
+     3
+    ],
+    [
+     "1,-1",
+     1
+    ],
+    [
+     "1,0",
+     2
+    ],
+    [
+     "2,0",
+     2
+    ]
+   ],
+   "legalAtSelection": 10,
+   "immediateTactic": false,
+   "tacticKind": null,
+   "ownWinPoints": 0,
+   "oppWinPoints": 1,
+   "forkMoves": [],
+   "certHit": false,
+   "expect": {
+    "p3": "unknown",
+    "status": "unknown",
+    "completedDepth": 5,
+    "move": "-4,0",
+    "nodesAt500ms": 2998
+   },
+   "recorded": {
+    "status": "unknown",
+    "proofDepth": 3,
+    "completedDepth": 5,
+    "ms": 800,
+    "exhausted": true
+   }
+  }
+ ]
+}
