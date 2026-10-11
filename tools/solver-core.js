@@ -34,6 +34,24 @@
   /* ⚠ 只接受**规范键**（构造器已断言 `key(x,y) === k`）。
      原写法 `k.split(',').map(Number)` 每次调用分配 2 个临时数组；改成 indexOf + slice。 */
   const point = k => { const i = k.indexOf(','); return { x: +k.slice(0, i), y: +k.slice(i + 1) }; };
+  /* ---- 查询后端（可切换；P10-2 实验）----
+     默认 `cols`：给 `at()` 配一份**数值双层 Map** 索引 `Map<x, Map<y, owner>>`。
+       · **无坐标碰撞**：每个坐标各自一个键，不把两个坐标压进一个有限精度整数；
+       · **不引入固定棋盘边界**：与 `key`/`point` 的表示域完全一致（不需要任何半径假设）；
+       · **只服务查询**：`board`（字符串键 `x,y`）仍然是唯一的对外表示、遍历顺序来源、
+         规范键与证书序列化来源；frontier 表示、TT 键格式、四旋转规范化、排序、证书格式**全部未动**。
+       · 维护点只有三处：构造、`play`、`undo`（都在 `board` 的同一处写操作旁边）。
+     设 `G4_AT_BACKEND=string`（或 `globalThis.__G4_AT_BACKEND = 'string'`）即**完全退回**
+     改动前的字符串查表实现（用于对照与回退）。开关在**加载时**解析、`at` 用原型替换，
+     所以默认路径上没有任何 per-call 分支。 */
+  const AT_BACKEND = (() => {
+    try {
+      const g = (typeof globalThis !== 'undefined' && globalThis.__G4_AT_BACKEND) || '';
+      const e = (typeof process !== 'undefined' && process.env && process.env.G4_AT_BACKEND) || '';
+      return (g || e) === 'string' ? 'string' : 'cols';
+    } catch (_) { return 'cols'; }
+  })();
+  const USE_COLS = AT_BACKEND === 'cols';
   const MATE = 1000000;
   const DEFAULT_FORK_SCAN = 16;   // 双威胁候选预筛上限（仅"找必胜手"，不删搜索宽度）
   const STOP = Symbol('搜索预算耗尽');
@@ -58,6 +76,7 @@
     constructor(entries = [['0,0', 3]]) {
       this.board = new Map(entries);
       if (this.board.get('0,0') !== 3) throw new Error('中心必须有固定块 3');
+      this.cols = USE_COLS ? new Map() : null;
       for (const [k, o] of this.board) {
         const { x, y } = point(k);
         if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) ||
@@ -66,6 +85,7 @@
             ![1, 2, 3].includes(o) || (o === 3 && k !== '0,0')) {
           throw new Error('棋盘必须使用规范整数坐标和阵营 1/2，固定块仅在中心');
         }
+        if (USE_COLS) this._idxSet(x, y, o);   // 与校验同一趟；校验不过就整体丢弃
       }
       for (const [k, o] of this.board) {
         if (o !== 3 && !this.supported(point(k))) throw new Error(`存在未稳定棋子：${k}`);
@@ -73,19 +93,43 @@
       this.frontier = new Set();
       for (const k of this.board.keys()) this.addNeighbors(point(k));
     }
-    at(x, y) { return this.board.get(key(x, y)) || 0; }
+    /* 数值查询索引的维护原语。**只用坐标本身当键**（不打包 ⇒ 无碰撞、无固定边界）。
+       ⚠ 同一列删空时把该列 Map 一并删掉，避免长搜索里堆积空列（查询语义不受影响）。 */
+    _idxSet(x, y, o) {
+      const cols = this.cols;
+      let c = cols.get(x);
+      if (c === undefined) { c = new Map(); cols.set(x, c); }
+      c.set(y, o);
+    }
+    _idxDel(x, y) {
+      const cols = this.cols;
+      const c = cols.get(x);
+      if (c === undefined) return;
+      c.delete(y);
+      if (c.size === 0) cols.delete(x);
+    }
+    /* 默认后端 = 数值双层 Map（无字符串拼接、无字符串哈希）。若后端被切回 `string`，
+       本方法会在类定义之后被**原型替换**回 `board.get(key(x,y)) || 0`。 */
+    at(x, y) {
+      const c = this.cols.get(x);
+      if (c === undefined) return 0;
+      const o = c.get(y);
+      return o === undefined ? 0 : o;
+    }
     supported(p) {
       const [dx, dy] = gravity(p.x, p.y);
       return !!this.at(p.x + dx, p.y + dy);
     }
     addNeighbors(p, added) {
-      /* 热路径：原来每个邻居都 `{x,y}` 建一个对象再交给 `supported()`（内部还要再拼一次键）。
-         这里就地算，少一次对象分配；判定与原来完全等价（`supported` 就是"下方那一格有子"）。 */
+      /* 热路径：占用检查与支撑检查都走 `at()`（数值后端）；`key()` 推迟到两项检查都通过之后
+         才拼 —— 判定与插入顺序与改动前**完全一致**（`frontier` 是 Set ⇒ 插入序）。
+         `at() !== 0` 与 `board.has(key)` 同义：owner 只可能是 1/2/3。 */
       for (let i = 0; i < CROSS.length; i++) {
-        const qx = p.x + CROSS[i][0], qy = p.y + CROSS[i][1], k = key(qx, qy);
-        if (this.board.has(k)) continue;
+        const qx = p.x + CROSS[i][0], qy = p.y + CROSS[i][1];
+        if (this.at(qx, qy)) continue;
         const g = gravity(qx, qy);
         if (!this.at(qx + g[0], qy + g[1])) continue;
+        const k = key(qx, qy);
         if (this.frontier.has(k)) continue;
         this.frontier.add(k);
         if (added) added.push(k);
@@ -127,19 +171,21 @@
       }
       return winner;
     }
-    /* ---- 热路径：play/undo 保持廉价（只动 board / frontier / 少量新支撑格）---- */
+    /* ---- 热路径：play/undo 保持廉价（只动 board / cols / frontier / 少量新支撑格）---- */
     play(p, side) {
       const k = key(p.x, p.y);
       if (!this.frontier.has(k) || this.board.has(k)) throw new Error(`非法落点：${k}`);
       this.frontier.delete(k);
       this.board.set(k, side);
+      if (USE_COLS) this._idxSet(p.x, p.y, side);
       const added = [];
       this.addNeighbors(p, added);
-      return { k, added };
+      return { k, added, x: p.x, y: p.y };
     }
     undo(u) {
       for (let i = 0; i < u.added.length; i++) this.frontier.delete(u.added[i]);
       this.board.delete(u.k);
+      if (USE_COLS) this._idxDel(u.x, u.y);
       this.frontier.add(u.k);
     }
     // 穿过 p 的 16 个四格窗口（p 分别位于 0..3 号位）
@@ -160,7 +206,7 @@
       const dx = DIRS[di][0], dy = DIRS[di][1];
       let c1 = 0, c2 = 0, unavail = 0, ex = 0, ey = 0, empty = 0, blocked = false;
       for (let t = 0; t < 4; t++) {
-        const x = ax + t * dx, y = ay + t * dy, o = this.board.get(key(x, y)) || 0;
+        const x = ax + t * dx, y = ay + t * dy, o = this.at(x, y);
         if (o === 3) { blocked = true; break; }
         if (o === 1) c1++;
         else if (o === 2) c2++;
@@ -222,6 +268,15 @@
       a.sort();
       return side + '|' + a.join(';');
     }
+  }
+
+  /* 后端切回 `string`：把 `at` 换回改动前的实现，并把索引原语置空。
+     ⚠ 用**原型替换**而不是在 `at` 里加分支 —— `at` 是热路径上调用最多的函数之一，
+       每调用一次多一个判断都是白付成本。替换发生在任何实例创建之前。 */
+  if (!USE_COLS) {
+    Position.prototype.at = function (x, y) { return this.board.get(key(x, y)) || 0; };
+    Position.prototype._idxSet = function () {};
+    Position.prototype._idxDel = function () {};
   }
 
   class Budget {
@@ -608,11 +663,23 @@
           （那套校验是给"外部传入的棋盘"用的，热路径上纯属开销）。
        ③ 连四只可能出现在**刚落的那一格**：用 O(24) 的 line() 取代 O(|B|·24) 的全盘
           winner() 扫描。（根局面没有"上一手"，仍走全盘扫描。）
-       ④ 双方即时胜点一次遍历求完（frontier 里的格必定为空且合法，可直接 line()）。 */
+       ④ 双方即时胜点一次遍历求完（frontier 里的格必定为空且合法，可直接 line()）。
+       ⑤ 数值查询索引与棋盘**同一趟**建好（`new Map(board)` + 每个条目一次 `_idxSet`，
+          不额外多扫一遍）；⚠ 索引必须在 `addNeighbors` 之前**完整**，否则 `at()` 会把
+          "还没轮到写入的列"读成空格 —— 所以两件事必须分成两个循环。 */
     const mkPos = (board) => {
       const p = Object.create(Position.prototype);
-      p.board = new Map(board);
+      p.board = new Map();
       p.frontier = new Set();
+      p.cols = USE_COLS ? new Map() : null;
+      for (const kv of board) {
+        const k = kv[0], o = kv[1];
+        p.board.set(k, o);
+        if (USE_COLS) {
+          const i = k.indexOf(',');
+          p._idxSet(+k.slice(0, i), +k.slice(i + 1), o);
+        }
+      }
       for (const k of p.board.keys()) p.addNeighbors(point(k));
       return p;
     };
@@ -2329,7 +2396,7 @@
       reused, sourceNodes: nodes };
   }
 
-  const api = { Position, chooseMove, gravity, createCache,
+  const api = { Position, chooseMove, gravity, createCache, AT_BACKEND,
     threatSearch, verifyProof, winPointsAll, pnsSearch, dfpnSearch, verifyStrategy,
     compressStrategy, verifyStrategyDag, verifyRefutation, dfpnChildThresholds,
     certifyRoot, chooseMoveCertified, rootSearchAmong, followRefutation,
