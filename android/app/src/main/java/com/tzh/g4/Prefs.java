@@ -14,6 +14,9 @@ public final class Prefs {
     private static final String K_TAP = "tap_to_place";
     private static final String K_ALIVE = "keep_alive";
     private static final String K_LAST_IP = "last_remote";
+    /* 注：「是否对外监听端口」刻意**不放**这里 —— 它是**会话内**状态（见 MainActivity.srvWanted）。
+       落盘会让"用过一次联机后，下次打开 App 就自动起服务器"（用户明确不要）。
+       残留的旧键 srv_want 已不再读取，留着也无害。 */
 
     private Prefs() {}
 

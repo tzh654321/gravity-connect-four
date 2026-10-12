@@ -3,6 +3,8 @@ android/out/
 android/build/
 # build.py 会把 index.html + android/inject/*.js 复制到这里，源不在此处
 android/app/src/main/assets/
+# 从设备取出的旧版对照（base.apk / game.html）与临时工作副本
+android/tmp/
 *.apk
 *.idsig
 
@@ -31,6 +33,7 @@ tools/fixtures/bounded-ply4-certs.jsonl
 # ============ 本地历史快照 / 备份（保留在本机，不入库）============
 backup_hard75_20260907/
 versions/
+重力四子棋-html-*.zip
 tools/备份-9.5.html
 tools/neural/重力四子棋-nn-test.html
 

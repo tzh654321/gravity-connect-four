@@ -17,6 +17,7 @@
 import argparse
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -63,6 +64,26 @@ def resolve_store_pass(cli_value=None):
 
 def log(msg):
     print("[build] " + msg, flush=True)
+
+
+MANIFEST = os.path.join(ANDROID, "app", "src", "main", "AndroidManifest.xml")
+
+
+def read_manifest_version():
+    """版本号的**单一真源**是 AndroidManifest.xml。
+
+    ⚠ 踩过的坑：aapt2 的 --version-code/--version-name 只在清单**没有**声明
+    android:versionCode / versionName 时才注入；本工程清单里写了这两项，
+    所以早先传这两个参数其实是**空操作**（打出来的 APK 版本号没变）。
+    这里显式读清单，并在工作副本里按解析结果改写，保证参数与产物一致。
+    """
+    with open(MANIFEST, encoding="utf-8") as f:
+        xml = f.read()
+    m_name = re.search(r'android:versionName="([^"]*)"', xml)
+    m_code = re.search(r'android:versionCode="([^"]*)"', xml)
+    name = m_name.group(1) if m_name else "1.0.0"
+    code = int(m_code.group(1)) if m_code else 1
+    return name, code
 
 
 def run(cmd, cwd=None):
@@ -132,6 +153,19 @@ class Builder:
         """
         os.makedirs(os.path.dirname(self.wsrc), exist_ok=True)
         shutil.copytree(self.src, self.wsrc, dirs_exist_ok=True)
+
+        # 把生效版本号写进工作副本清单（原因见 read_manifest_version）
+        man = os.path.join(self.wsrc, "AndroidManifest.xml")
+        with open(man, encoding="utf-8") as f:
+            xml = f.read()
+        patched = re.sub(r'android:versionCode="[^"]*"',
+                         'android:versionCode="%d"' % self.ver_code, xml)
+        patched = re.sub(r'android:versionName="[^"]*"',
+                         'android:versionName="%s"' % self.ver_name, patched)
+        if patched != xml:
+            with open(man, "w", encoding="utf-8", newline="") as f:
+                f.write(patched)
+        log("版本号：%s (%d)" % (self.ver_name, self.ver_code))
 
         assets = os.path.join(self.wsrc, "assets")
         os.makedirs(assets, exist_ok=True)
@@ -261,12 +295,19 @@ def main():
     ap.add_argument("--jdk", default=DEFAULT_JDK)
     ap.add_argument("--work", default=None)
     ap.add_argument("--jdk17", default=DEFAULT_JDK17)
-    ap.add_argument("--version-name", default="1.0.0")
-    ap.add_argument("--version-code", type=int, default=1)
+    ap.add_argument("--version-name", default=None,
+                    help="版本文本；留空则取 AndroidManifest.xml（单一真源）")
+    ap.add_argument("--version-code", type=int, default=None,
+                    help="版本整数；留空则取 AndroidManifest.xml（单一真源）")
     ap.add_argument("--store-pass", default=None,
                     help="签名口令；不传则依次取环境变量 G4_STORE_PASS、android/.keystore-pass")
     a = ap.parse_args()
-    Builder(a.sdk, a.jdk, a.version_name, a.version_code, a.work, a.jdk17, a.store_pass).build()
+    v_name, v_code = read_manifest_version()
+    if a.version_name:
+        v_name = a.version_name
+    if a.version_code is not None:
+        v_code = a.version_code
+    Builder(a.sdk, a.jdk, v_name, v_code, a.work, a.jdk17, a.store_pass).build()
 
 
 if __name__ == "__main__":

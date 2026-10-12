@@ -29,6 +29,8 @@ const d = await G.aiChooseMove();          // ← 别忘了 await
 | `drive.js` | 命令行「我下棋、AI 应手」交互驱动器，状态存 `drive_state.json` |
 | `check-net-hint.js` | 回归：联机入口可用性提示（模拟 404 / 200 / fetch 抛错，共 10 项断言） |
 | `sim_net_restart.js` | 联机 restart 消息的状态机模拟（对齐 index.html 的 `userReset`/`netHandle`） |
+| `check-ui-net-fix.js` | 回归：**UI / 联机修复（74 项）**——① 机器先手切模式**不落子**、主按钮「开始对局 ↔ 重新开局」；② 选项区双列 DOM/CSS（含窄屏单列回退）；③ `nativeServer` 桥 JSON；④ 联机开房 `lastId/startSeq` **复位**（含"把复位删掉即复现 bug"的 A/B 对照）；⑤ Android `srvWanted` 改为**会话内**状态（不再落盘）；⑥ **服务器启动时机**（只认「开房/加入」，模式切换与 `netEnterMode` 都不触碰）；⑦ 用 `G4Native` 桩断言"切到联机模式不发 `setConfig`、点开房才发 `{server:true}`、离开发 `false`"；⑧ **按钮文案一致性**：`updateUI()` 写入值必须等于静态 HTML 标签（不等就说明静态那处是死代码 —— 踩过：把 `#mmPause` 的「暂停」换成 `⏸` 却不生效，因为每次 `updateUI` 都被改回去） |
+| `check-net-recreate.js` | **端到端联机回归**（真 `server.js` + 两个沙箱客户端，一 host 一 guest，**13 项**）：① 建房间 → 加入 → host 进大厅（`#netRoom`/`#netPrep` 可见）；② `netLeave`（**模拟"切到其它模式"**）→ 切回 → 重复一轮，验证**二次开房仍能进大厅**；③ **面板常显**：只开房、**不加对手**时 `#netRoom`/`#netPrep` 也必须可见 —— 该节自带"把常显改回旧逻辑即隐藏"的**复现对照**，用来证明修复前后效果不同。⚠ 沙箱的 `setTimeout` 是桩（永不触发）⇒ 必须在 `loadGame` 之后**把 `setTimeout/clearTimeout/setInterval/clearInterval` 换成 Node 真的**，否则 `pollLoop` 只跑一轮就永久挂起。`--broken` 删掉 `lastId` 复位语句，确认"没有这条修复就复现" |
 
 ```bash
 node tools/tune-weights.js --pop 8 --gens 6 --games 12 --diff normal

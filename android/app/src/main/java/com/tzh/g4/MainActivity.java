@@ -49,6 +49,11 @@ public class MainActivity extends Activity {
     private boolean paused = true;
     private boolean pageLoaded = false;
     private long lastBack;
+    /* 「要求对外监听端口」= **会话内**状态：页面在「点创建房间 / 加入」时置 true，
+       离开联机模式或点「断开连接」时置 false。
+       ⚠ 刻意**不持久化**（早先写在 SharedPreferences 里 ⇒ 用过一次联机之后，
+       下次一打开 App 就自动起服务器；用户明确不要这个行为）。 */
+    private volatile boolean srvWanted = false;
 
     public static MainActivity get() { return inst; }
 
@@ -160,8 +165,12 @@ public class MainActivity extends Activity {
         else KeepAliveService.stop(this);
     }
 
+    /* ⚠ 启动条件 = 本机模式 **且** 页面本次会话明确请求（srvWanted）。
+       页面只在「点创建房间 / 加入」时请求 ⇒ 打开 App、以及**切到联机模式本身**
+       都不会起服务器。本机模式的 /api/* 是进程内直接处理的（G4Router → G4Server.handleApi），
+       只有要让局域网里**别的设备**加入时才真的需要监听端口。 */
     private void syncServer() {
-        boolean want = Prefs.isLocal(this);
+        boolean want = Prefs.isLocal(this) && srvWanted;
         int port = Prefs.port(this);
         if (want) {
             if (listener == null || !listener.isRunning() || listener.port() != port) {
@@ -189,6 +198,10 @@ public class MainActivity extends Activity {
     }
 
     public boolean serverRunning() { return listener != null && listener.isRunning(); }
+
+    /* 页面（注入层）请求的"是否要对外监听端口"。会话内有效，随进程结束而重置。 */
+    public boolean serverWanted() { return srvWanted; }
+    public void setServerWanted(boolean v) { srvWanted = v; }
 
     /* ---------------- 页面 ---------------- */
     public void reloadPage() {

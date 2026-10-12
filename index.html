@@ -59,6 +59,10 @@ h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
 .btns button:hover{background:#f1f3f8;border-color:#b6bdc9}
 .chk{display:flex;align-items:center;gap:6px;font-size:12px;color:#4a5058;margin:4px 0;cursor:pointer}
 .chk input{accent-color:#242932;margin:0}
+/* 选项两列：面板宽度 254px、每列约 122px，够放「复选框 + 四个汉字」。
+   ⚠ 列宽低于 96px（很窄的屏 / 面板被改窄）就退回单列，避免文字被压出省略号。 */
+.opts{display:grid;grid-template-columns:repeat(2,minmax(96px,1fr));gap:0 8px}
+@supports not (grid-template-columns:repeat(2,minmax(96px,1fr))){ .opts{display:block} }
 .hint{margin-top:10px;font-size:10.5px;color:var(--mut);line-height:1.65;border-top:1px dashed var(--bd);padding-top:8px}
 #mmRow{display:none;align-items:center;gap:7px;margin-top:8px;font-size:11px;color:var(--mut)}
 #mmRow.show{display:flex}
@@ -163,8 +167,8 @@ h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
   </div>
 
   <div id="mmRow">
-    <button id="mmPause">暂停</button>
-    <span>节奏</span><input type="range" id="mmSpeed" min="0" max="100" value="62">
+    <button id="mmPause">⏸</button>
+    <input type="range" id="mmSpeed" min="0" max="100" value="62">
   </div>
 
   <div id="netBox">
@@ -204,11 +208,14 @@ h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
   </div>
 
   <div class="lbl">选项</div>
-  <label class="chk"><input type="checkbox" id="optPredict" checked>落点预测</label>
-  <label class="chk"><input type="checkbox" id="optFollow" checked>镜头跟随</label>
-  <label class="chk"><input type="checkbox" id="optCoord">显示坐标</label>
-  <label class="chk"><input type="checkbox" id="optNumber">显示序号</label>
-  <label class="chk"><input type="checkbox" id="optDanger" checked>危险提示</label>
+  <!-- 两列网格（顺序与手机版一致，只是排成两列以省竖屏高度）；窄屏自动退回单列见 .opts CSS -->
+  <div class="opts">
+    <label class="chk"><input type="checkbox" id="optPredict" checked>落点预测</label>
+    <label class="chk"><input type="checkbox" id="optFollow" checked>镜头跟随</label>
+    <label class="chk"><input type="checkbox" id="optCoord">显示坐标</label>
+    <label class="chk"><input type="checkbox" id="optNumber">显示序号</label>
+    <label class="chk"><input type="checkbox" id="optDanger" checked>危险提示</label>
+  </div>
 
   <div class="hint">滚轮缩放 · 左键拖拽平移 · 回合内双击落子</div>
 </div>
@@ -240,10 +247,10 @@ h1{margin:0;font-size:15px;letter-spacing:.6px;font-weight:700}
       <svg width="230" height="200" viewBox="0 0 230 200">
         <!-- 四个分区彩色矩形：分界线对齐「固定块边缘」（块半边长6px：左109 右121 上94 下106），
              使每一段半轴都落在对应重力区内，从而彩色区域囊括两条坐标轴 -->
-        <rect x="109" y="8"   width="116" height="86"  fill="#fdeee7" stroke="#c3d2e8"/>  <!-- 右上：向下 -->
-        <rect x="8"   y="8"   width="101" height="98"  fill="#eaf1fc" stroke="#c3d2e8"/>  <!-- 左上：向右 -->
-        <rect x="121" y="94"  width="104" height="98"  fill="#e9f4ea" stroke="#c3d2e8"/>  <!-- 右下：向左 -->
-        <rect x="8"   y="106" width="113" height="86"  fill="#f7eef7" stroke="#c3d2e8"/>  <!-- 左下：向上 -->
+        <rect x="109" y="8"   width="116" height="86"  fill="#FDEEE7" stroke="#c3d2e8"/>  <!-- 右上：向下 -->
+        <rect x="8"   y="8"   width="101" height="98"  fill="#F7EEF7" stroke="#c3d2e8"/>  <!-- 左上：向右 -->
+        <rect x="121" y="94"  width="104" height="98"  fill="#EAF1FC" stroke="#c3d2e8"/>  <!-- 右下：向左 -->
+        <rect x="8"   y="106" width="113" height="86"  fill="#E9F4EA" stroke="#c3d2e8"/>  <!-- 左下：向上 -->
         <!-- 固定块 (0,0) -->
         <rect x="109" y="94" width="12" height="12" fill="#4a5058" stroke="#22262e"/>
         <!-- 重力方向箭头：均指向中心（与 gravAt 一致） -->
@@ -4393,6 +4400,10 @@ const state = {
   opener:P1,             // 本局先手（悔棋撤空盘 / 联机换先时用于复位回合）
   mmPaused:false, mmDelay:420,
   thinking:false,
+  /* 是否在等用户点「开始对局」：只有**开局方是机器**（机·人 / 机·机）时才可能为 true。
+     ⚠ 需求：切到这些模式时**不要立刻落子**（人还没看清界面），把按钮变成「开始对局」，
+     点了才启动 AI；启动后按钮恢复成「重新开局」。见 resetGame / userReset / updateUI。 */
+  awaitStart:false,
   gen:0,              // 棋盘代次：每次重置/悔棋/导入 +1；AI 异步计算期间据此检测棋盘是否已被改动
 };
 let moving = null;       // 正在下落的棋子
@@ -4413,7 +4424,12 @@ const isHuman = (owner)=>{
   }
 };
 
-function resetGame(){
+/* 本模式下"开局就该机器落子"的只有这两种（人·人 / 人·机 都是人先，联机没有 AI）。 */
+const aiOpens = ()=> state.mode === 'mh' || state.mode === 'mm';
+
+/* opts.awaitStart = true ⇒ 清盘后**停在"待开始"**，不自动落子（切模式时用）。
+   其余调用（重开 / 导入残局 / 悔棋撤空）默认立即按当前回合续走。 */
+function resetGame(opts){
   certReset('重开一局');
   occ = new Map();
   occ.set(K(0,0), BLOCK);
@@ -4429,9 +4445,10 @@ function resetGame(){
   predictKey = ''; predictCell = null;
   clearTimeout(aiTimer); aiTimer = null;
   banner.classList.remove('show');
+  state.awaitStart = !!(opts && opts.awaitStart) && aiOpens();
   updateAliveNeed();
   updateUI();
-  maybeAI();            // 机-人 / 机-机 模式下，开局即由 AI 落第一手
+  if (!state.awaitStart) maybeAI();   // 机-人 / 机-机 且已开始 ⇒ 开局即由 AI 落第一手
 }
 
 /* 通知 native 后台保活是否需要：棋盘为空 → false（无需保活）；
@@ -4450,6 +4467,7 @@ function newGame(firstOwner){
   state.opener = firstOwner;
   state.turn = firstOwner;
   net.lobby = false;
+  state.awaitStart = false;          // 联机开局由服务器仲裁 ⇒ 不存在"待开始"
   updateUI();
   maybeAI();
 }
@@ -4628,6 +4646,8 @@ let aiTimer = null;
 function yieldFrame(){ return new Promise(function(res){ requestAnimationFrame(function(){ res(); }); }); }
 function maybeAI(){
   clearTimeout(aiTimer); aiTimer = null;
+  /* 等用户点「开始对局」期间一律不落子（切到机器先手模式后的初始状态） */
+  if (state.awaitStart) { state.thinking = false; updateUI(); return; }
   if (state.phase !== 'idle') return;
   if (state.mode === 'net') { state.thinking = false; return; }   // 联机无 AI
   if (isHuman(state.turn)) { state.thinking = false; updateUI(); return; }
@@ -5135,6 +5155,7 @@ function showZoom(pct){
 }
 const mmRow = document.getElementById('mmRow');
 const mmPause = document.getElementById('mmPause');
+const btnNewEl = document.getElementById('btnNew');   // 文案会在「开始对局 / 重新开局」间切换
 const mmSpeed = document.getElementById('mmSpeed');
 const optPredict = document.getElementById('optPredict');
 const optFollow = document.getElementById('optFollow');
@@ -5177,11 +5198,17 @@ function updateUI(){
   }
   moveCount.textContent = '落子 ' + state.moveCount;
 
+  /* 主按钮：机器先手模式在用户点「开始对局」之前，显示的就是这句话（见 state.awaitStart） */
+  if (btnNewEl) btnNewEl.textContent = state.awaitStart ? '开始对局' : '重新开局';
+
   const needAI = state.mode !== 'hh' && state.mode !== 'net';
   const diffSelEl = document.getElementById('diffSel');
   if (diffSelEl) diffSelEl.disabled = !needAI;   // 双人对战时禁用 AI 强度选择
   mmRow.classList.toggle('show', state.mode === 'mm');
-  mmPause.textContent = state.mmPaused ? '继续' : '暂停';
+  /* ⚠ 这个按钮的文案由这里决定：#mmPause 标签里写的字只是初始值，
+     updateUI() 每次跑都会把它覆盖 ⇒ **改文案要改这一行**，改 HTML 没用。
+     语义 = 这个按钮**接下来要做什么**：运行中显示 ⏸（可暂停），暂停中显示 ⏵（可继续）。 */
+  mmPause.textContent = state.mmPaused ? '⏵' : '⏸';
   netBoxEl.classList.toggle('show', state.mode === 'net');
   undoBtn.disabled = !canUndo();
   undoBtn.title = state.mode === 'mm' ? '机机模式不可悔棋'
@@ -5193,6 +5220,19 @@ function updateUI(){
 }
 
 let netStartSeq = 0;   // 重开轮次号（host/guest 各自计数；host 决定权威先手）
+
+/* 请求 native 开/关「对外监听端口」。仅 Android App 内有效（浏览器没有 G4Native ⇒ 直接跳过）。
+   ⚠ 时机（按用户口径）：
+     · 起 = 在联机模式下**点「创建房间」或「加入」**时（netCreate / netJoin）；
+     · 停 = **离开联机模式**或点「断开连接」时（netLeave）。
+   **切到联机模式本身不启动**；打开 App 也不启动。
+   本机模式的 /api/* 是进程内直接处理的，只有要让**别的设备**（如另一台手机/电脑浏览器）加入时才需要监听端口。 */
+function nativeServer(on){
+  try {
+    if (window.G4Native && window.G4Native.setConfig)
+      window.G4Native.setConfig(JSON.stringify({ server: !!on }));
+  } catch (e) { /* 桌面端无 native 桥，忽略 */ }
+}
 
 /* 联机模式下，重新开局：按「下轮先手」房规由本端算好先手并广播，再本地开局。
    房规「重开方后手」→ 点重开的一方让对方先走；单机则直接红先。
@@ -5217,6 +5257,12 @@ function userReset(){
       toast('已请求重开 · 等待房主开局');
       updateUI();
     }
+  } else if (state.awaitStart){
+    /* 机器先手 / 机机模式的"待开始"状态：这一下是**开始对局**，不是重开 ——
+       棋盘已经是干净的新局，这里只负责启动 AI 并把按钮文案换回「重新开局」。 */
+    state.awaitStart = false;
+    updateUI();
+    maybeAI();
   } else {
     resetGame();
   }
@@ -5228,12 +5274,14 @@ document.getElementById('modeSeg').addEventListener('click', e=>{
     toast('联机需要服务端托管本页：先运行 node server/server.js 8765，再用 http://<电脑IP>:8765/ 打开');
     return;
   }
-  if (state.mode === 'net' && b.dataset.mode !== 'net') netLeave(true);   // 切走即断开
+  /* 切走联机：断开房间（并关掉对外监听，见 netLeave）。
+     ⚠ 反过来 **切到联机模式不启动服务器** —— 只有真的点「创建房间 / 加入」才起（见 netCreate / netJoin）。 */
+  if (state.mode === 'net' && b.dataset.mode !== 'net') netLeave(true);
   document.querySelectorAll('#modeSeg button').forEach(x=> x.classList.remove('on'));
   b.classList.add('on');
   state.mode = b.dataset.mode;
   state.mmPaused = false;
-  resetGame();
+  resetGame({ awaitStart: true });   // 切模式后停在"待开始"：机器先手不再一进来就落子
 });
 /* AI 强度：下拉选择框
    注意历史坑：早期 UI 把名字整体平移了一位（按钮"简单"实际是 normal、按钮"普通"实际是 hard），
@@ -5486,18 +5534,41 @@ async function netPing(){
 function refreshNetUI(){
   const inNet = state.mode === 'net';
   netLobbyEl.style.display = (inNet && !net.connected) ? '' : 'none';
-  netRoomEl.style.display  = (inNet &&  net.connected) ? '' : 'none';
-  if (!inNet || net.connected) return;
-  if (net.waiting) netHint.textContent = '房间码 ' + net.room + ' · 等待对手加入…';
+  /* 房规 / 准备区在**联机模式下始终可见** —— 不依赖"是否已连上、对手是否已到"。
+     ⚠ 踩过的坑：这里以前是 `(inNet && net.connected)` ⇒ 开房后对手还没加入、
+     或"切到别的模式再切回来"（对手已掉线）时整块不出现，看起来像"功能没了"。 */
+  netRoomEl.style.display = inNet ? '' : 'none';
+  if (!inNet) return;
+  if (net.waiting && !net.connected) netHint.textContent = '房间码 ' + net.room + ' · 等待对手加入…';
+  refreshPrep();
 }
 
-/* 准备大厅 / 对局中的连接面板内容 */
+/* 房规 / 准备区的**内容与可操作性**（面板本身常显，见 refreshNetUI）。
+   可操作只在「已连接 且 在准备大厅」成立：未连接点了没意义；
+   **对局中禁改房规**（否则可以中途打开"允许悔棋"再狂悔）。 */
 function refreshPrep(){
-  if (!net.connected || state.mode !== 'net') return;
+  if (state.mode !== 'net') return;
+  const editable = !!(net.connected && net.lobby);
+  netPrepEl.style.display = 'flex';                                   // 常显
+  netReadyBtn.disabled = !editable;
+  netLeaveBtn.disabled = !net.connected;
+  optAllowUndo.disabled = !editable;
+  firstSegEl.querySelectorAll('button').forEach(b=>{ b.disabled = !editable; });
+  syncRuleUI();                                                       // 房规控件回显
+
+  if (!net.connected){
+    netInfoEl.textContent = '未连接';
+    netPrepState.textContent = '创建房间或输入房间码加入后，双方点「准备」开始';
+    netReadyBtn.classList.remove('on');
+    netReadyBtn.textContent = '准备';
+    return;
+  }
   netInfoEl.textContent = '房间 ' + net.room + ' · 你执' + (net.myColor === P1 ? '红' : '蓝');
-  netPrepEl.style.display = net.lobby ? 'flex' : 'none';
   if (!net.lobby){
     netInfoEl.textContent += ' · 对局中';
+    netPrepState.textContent = '对局中 · 房规在下一局开始前可改';
+    netReadyBtn.classList.remove('on');
+    netReadyBtn.textContent = '准备';
     return;
   }
   netInfoEl.textContent += (net.oppState === 'offline' ? ' · 对方已断线' : '');
@@ -5508,8 +5579,6 @@ function refreshPrep(){
   netPrepState.textContent = t;
   netReadyBtn.classList.toggle('on', net.ready);
   netReadyBtn.textContent = net.ready ? '已准备（点击取消）' : '准备';
-  /* 房规控件回显（避免重复发送） */
-  syncRuleUI();
 }
 
 function setNetBusy(busy, txt){
@@ -5520,11 +5589,17 @@ function setNetBusy(busy, txt){
 
 async function netCreate(){
   if (net.busy || net.waiting) return;
+  nativeServer(true);                 // 开房＝要给别人进 ⇒ 明确请求监听端口
   net.busy = true; setNetBusy(true, '创建中…');
   try{
     const d = await (await fetch('/api/create')).json();
     if (d.err){ netHint.textContent = d.err; return; }
     net.room = d.room; net.token = d.token; net.side = 'host'; net.waiting = true;
+    /* ⚠ 新房间的消息 id 从 **0** 重新开始（服务端 `rooms.set` 时 `seq:0`，/api/create 不返回 seq）。
+       若不把 lastId 一起归零，第二次开房会用**上一个房间残留的** lastId 去拉
+       `?since=<旧值>` ⇒ 那条 `sys/lobby`（id=1）被当成历史跳过 ⇒ 永远进不了大厅
+       （表现：切到别的模式再切回联机、开房后「准备/下轮先手」不再出现）。 */
+    net.startSeq = 0; net.lastId = 0;
     net.active = true;                              // 创建后即开始轮询，等待 sys/start
     netStore.set({ room:net.room, token:net.token, side:'host' });
     ensurePollLoop();
@@ -5541,6 +5616,7 @@ async function netJoin(){
   const reTok = (saved && saved.side === 'guest' && saved.room === code) ? saved.token : '';
   net.busy = true; setNetBusy(true, '加入中…');
   try{
+    nativeServer(true);                             // 加入＝要参与联机 ⇒ 请求监听端口
     const d = await (await fetch('/api/join?room=' + encodeURIComponent(code) +
                                 (reTok ? '&token=' + encodeURIComponent(reTok) : ''))).json();
     if (d.err){ netHint.textContent = d.err; netStore.set(null); return; }
@@ -5570,6 +5646,8 @@ function netStart(){
   } else {
     toast('已进入房间 · 请调整房规并点「准备」');
   }
+  /* 房主权威：连上就把当前房规同步给对方，避免"房主改了、对方还是默认" */
+  if (net.side === 'host') netSend({ type:'rules', rules: net.rules });
   ensurePollLoop();
 }
 
@@ -5765,6 +5843,7 @@ function netDropped(reason){
   net.oppState = 'none';
   net.lobby = true; net.ready = false; net.peerReady = false;
   net.room = ''; net.token = ''; net.side = '';
+  net.startSeq = 0; net.lastId = 0;      // 断开即归零：下次进任何房间都从头拉，不沿用旧水位
   /* 保留存档：意外断线后刷新页面可凭 token 重连 */
   netCodeInp.value = ''; netHint.textContent = '';
   setNetBusy(false);
@@ -5774,6 +5853,7 @@ function netDropped(reason){
 
 async function netLeave(silent){
   if (net.connected && !silent) netSend({ type:'bye' });
+  nativeServer(false);                             // 离开联机/断开连接 ⇒ 关掉对外监听端口
   netStore.set(null);                              // 主动断开：清除重连存档
   netDropped('');
 }

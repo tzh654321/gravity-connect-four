@@ -91,6 +91,7 @@ public class G4Bridge {
             o.put("shimSrc", G4Assets.sourceLabel(act, G4Assets.SHIM_JS));
             o.put("ip", Net.lanIp());
             o.put("listening", act.serverRunning());
+            o.put("server", act.serverWanted());
             return o.toString();
         } catch (Exception e) {
             return "{}";
@@ -102,6 +103,10 @@ public class G4Bridge {
         try {
             JSONObject o = new JSONObject(json);
             if (o.has("local")) Prefs.setLocal(act, o.optBoolean("local"));
+            /* server: 页面请求开/关"对外监听端口"。**只在「点创建房间 / 加入」时 true**、
+               离开联机或断开连接时 false ⇒ 打开 App 与切到联机模式本身都不起服务器。
+               会话内状态（不落盘），见 MainActivity.srvWanted。 */
+            if (o.has("server")) act.setServerWanted(o.optBoolean("server"));
             if (o.has("base")) Prefs.setRemoteBase(act, o.optString("base", ""));
             if (o.has("port")) Prefs.setPort(act, o.optInt("port", 8765));
             if (o.has("tap")) Prefs.setTapToPlace(act, o.optBoolean("tap"));
